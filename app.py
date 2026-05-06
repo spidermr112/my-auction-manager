@@ -5,50 +5,46 @@ import os
 import re
 import time
 
-# --- 1. 페이지 설정 및 레이아웃 강제 고정 (이 부분이 핵심입니다) ---
+# --- 1. 페이지 설정 및 레이아웃 강제 고정 (핵심 수정) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 전체 컨테이너 너비 제한 및 중앙 정렬 (화면이 너무 넓어지는 것 방지) */
+    /* 전체 컨테이너 여백 최적화 */
     .block-container {
-        max-width: 1600px !important;
-        padding-top: 2rem !important;
-        padding-bottom: 2rem !important;
-        padding-left: 3rem !important;
-        padding-right: 3rem !important;
-        margin: 0 auto !important;
+        padding-top: 1.5rem !important;
+        padding-bottom: 1rem !important;
+        max-width: 98% !important; /* 화면을 최대한 넓게 쓰되 여백 유지 */
     }
 
-    /* 2. 좌측(등록)과 우측(목록)의 가로 배치 강제 박제 (아래로 안 떨어짐) */
+    /* 좌우 컬럼 배치 강제 고정 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        align-items: flex-start !important;
-        gap: 2.5rem !important;
+        gap: 2rem !important;
     }
 
-    /* 3. 좌측 등록 섹션: 400px로 너비 절대 고정 */
+    /* [좌측 등록창] 400px로 절대 고정 - 브라우저가 넓어져도 변하지 않음 */
     [data-testid="column"]:nth-of-type(1) {
-        flex: 0 0 400px !important;
         width: 400px !important;
         min-width: 400px !important;
         max-width: 400px !important;
+        flex: 0 0 400px !important;
     }
 
-    /* 4. 우측 목록 섹션: 나머지 남는 공간을 모두 채움 */
+    /* [우측 목록창] 나머지 모든 공간을 차지하며 유동적으로 확장 */
     [data-testid="column"]:nth-of-type(2) {
         flex: 1 1 auto !important;
         min-width: 0 !important;
     }
 
-    /* 5. 라디오 버튼 가로 배치 강제 유지 (줄바꿈 방지) */
+    /* 라디오 버튼 가로 정렬 및 줄바꿈 방지 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 8px !important;
+        gap: 12px !important;
     }
     div[role="radiogroup"] label {
         white-space: nowrap !important;
@@ -56,7 +52,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기능 수정 절대 없음) ---
+# --- 2. 데이터 관리 로직 (기존 기능 유지) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -105,7 +101,7 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
 # --- 3. 화면 배치 ---
-col_reg, col_list = st.columns([1, 2.2])
+col_reg, col_list = st.columns([1, 2.2]) # 설정과 상관없이 CSS가 우선 적용됨
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
