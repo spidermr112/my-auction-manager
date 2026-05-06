@@ -5,8 +5,23 @@ import os
 import re
 import time
 
-# --- 1. 페이지 설정 ---
+# --- 1. 페이지 설정 및 레이아웃 강제 고정 (CSS) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
+
+st.markdown("""
+    <style>
+    /* 화면이 좁아져도 컬럼이 아래로 내려가지 않도록 강제 고정 */
+    [data-testid="column"] {
+        flex-direction: column !important;
+        display: flex !important;
+        min-width: 0 !important;
+    }
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+        display: flex !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # --- 2. 데이터 관리 로직 ---
 DB_FILE = "property_data.csv"
@@ -33,24 +48,18 @@ def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
 
 def parse_flexible_price(price_str):
-    """ . , - 및 공백을 /로 변환하고 한글 금액 처리 """
     if not price_str: return ""
-    
-    # 띄어쓰기, 마침표, 하이픈을 모두 슬래시(/)로 치환
-    # 연속된 공백도 하나로 처리하기 위해 정규식 보강
+    # . , - 공백을 /로 변환
     processed = re.sub(r'[\.\-\s]+', '/', price_str.strip())
     
     if '/' in processed:
         try:
-            parts = [p for p in processed.split('/') if p] # 빈 문자열 제거
+            parts = [p for p in processed.split('/') if p]
             if len(parts) >= 2:
                 dep = int(re.sub(r'[^0-9]', '', parts[0]))
                 mon = int(re.sub(r'[^0-9]', '', parts[1]))
-                # 저장 형식: 4000/35 (환산 7500)
                 return f"{dep}/{mon}(환산 {dep + (mon * 100)})"
         except: return processed
-
-    # 일반 금액 (한글 포함) 처리
     try:
         if processed.isdigit(): return processed
         res = 0
@@ -64,10 +73,9 @@ def parse_flexible_price(price_str):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# --- 3. 레이아웃 배분 ---
+# --- 3. 좌우 배치 (비율 고정) ---
 col_reg, col_list = st.columns([1, 2.2])
 
-# --- [좌측] 매물 등록 섹션 ---
 with col_reg:
     st.markdown("### 📍 매물 등록")
     with st.form("reg_form", clear_on_submit=True):
@@ -80,7 +88,6 @@ with col_reg:
             "토지": ["대지", "임야", "농지", "기타"]
         }
         reg_sub = st.radio("물건 소분류", subs[reg_cat], horizontal=True)
-        
         reg_purp = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
         reg_trade = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         
@@ -91,8 +98,7 @@ with col_reg:
         else:
             reg_room, reg_bath = "", ""
 
-        # 도움말에 공백 입력 가능 안내 추가
-        reg_price = st.text_input("거래가액", placeholder="예: 4000 35 / 4000.35 / 3억 5천")
+        reg_price = st.text_input("거래가액")
         reg_addr = st.text_input("소재지 상세")
         reg_area = st.text_input("면적(평 or ㎡)")
         reg_desc = st.text_area("특약내용")
@@ -116,11 +122,10 @@ with col_reg:
             st.success("저장 완료!")
             st.rerun()
 
-# --- [우측] 매물 목록 및 필터 섹션 ---
 with col_list:
     with st.container(border=True):
         st.markdown("🔍 **필터 및 검색**")
-        s_query = st.text_input("키워드 통합 검색 (주소, 특약 등)")
+        s_query = st.text_input("키워드 통합 검색")
         
         f_col1, f_col2 = st.columns(2)
         with f_col1:
