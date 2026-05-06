@@ -58,9 +58,14 @@ def parse_korean_price(price_str):
         return str(int(result)) if (eok or cheon) else re.sub(r'[^0-9]', '', price_str)
     except: return price_str
 
-# 세션 초기화
+# 세션 초기화 및 연동 함수
 if 'data' not in st.session_state: st.session_state.data = load_data()
 if 'last_submit_time' not in st.session_state: st.session_state.last_submit_time = 0
+
+# [중요] 대분류-소분류 연동 함수
+def toggle_group(group_key, sub_keys):
+    for k in sub_keys:
+        st.session_state[k] = st.session_state[group_key]
 
 # --- 3. 사이드바: 매물 등록 ---
 with st.sidebar:
@@ -84,11 +89,7 @@ with st.sidebar:
             current_time = time.time()
             if current_time - st.session_state.last_submit_time > 2.0:
                 st.session_state.last_submit_time = current_time
-                final_area = reg_area_raw
-                if '평' in reg_area_raw:
-                    try: final_area = f"{round(float(re.sub(r'[^0-9.]', '', reg_area_raw)) * 3.3058, 2)}㎡({reg_area_raw})"
-                    except: pass
-                new_row = pd.DataFrame([{"id": f"P_{int(current_time * 1000)}", "receipt_date": reg_date, "item_category": reg_cat, "item_sub_category": reg_sub, "purpose": reg_purp, "trade_type": reg_trade, "price": parse_korean_price(reg_price_raw), "address": reg_addr or "(미입력)", "area": final_area or "(미입력)", "description": reg_desc, "status": "진행중"}])
+                new_row = pd.DataFrame([{"id": f"P_{int(current_time * 1000)}", "receipt_date": reg_date, "item_category": reg_cat, "item_sub_category": reg_sub, "purpose": reg_purp, "trade_type": reg_trade, "price": parse_korean_price(reg_price_raw), "address": reg_addr or "(미입력)", "area": reg_area_raw or "(미입력)", "description": reg_desc, "status": "진행중"}])
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
                 save_data(st.session_state.data)
                 st.rerun()
@@ -98,38 +99,41 @@ st.title("🏘️ 파크부동산 통합 관리 시스템")
 s_query = st.text_input("🔍 키워드 검색 (주소, 특약 등)", placeholder="검색어를 입력하세요.")
 
 with st.expander("✅ 필터 상세 선택", expanded=True):
-    # 주거용
+    # 1. 주거용 필터
     c = st.columns([1, 1.2, 1.2, 1, 1, 1.5])
-    f_ju = c[0].checkbox("🔴 주거용", key="f_ju")
-    f_yeon = c[1].checkbox("연립/다세대", value=f_ju, key="f_yeon")
-    f_dan = c[2].checkbox("단독/다가구", value=f_ju, key="f_dan")
-    f_jeon = c[3].checkbox("전원주택", value=f_ju, key="f_jeon")
-    f_apt = c[4].checkbox("아파트", value=f_ju, key="f_apt")
-    f_op = c[5].checkbox("오피스텔(주거)", value=f_ju, key="f_op")
+    ju_subs = ["f_yeon", "f_dan", "f_jeon", "f_apt", "f_op"]
+    f_ju = c[0].checkbox("주거용", key="f_ju", on_change=toggle_group, args=("f_ju", ju_subs))
+    f_yeon = c[1].checkbox("연립/다세대", key="f_yeon")
+    f_dan = c[2].checkbox("단독/다가구", key="f_dan")
+    f_jeon = c[3].checkbox("전원주택", key="f_jeon")
+    f_apt = c[4].checkbox("아파트", key="f_apt")
+    f_op = c[5].checkbox("오피스텔(주거)", key="f_op")
 
-    # 비주거용
+    # 2. 비주거용 필터
     b = st.columns([1, 1.2, 1, 1, 1.2, 1.5])
-    f_bi = b[0].checkbox("🔴 비주거용", key="f_bi")
-    f_sang = b[1].checkbox("상가/사무실", value=f_bi, key="f_sang")
-    f_gong = b[2].checkbox("공장/창고", value=f_bi, key="f_gong")
-    f_build = b[3].checkbox("빌딩/건물", value=f_bi, key="f_build")
-    f_jisik = b[4].checkbox("지식산업센터", value=f_bi, key="f_jisik")
-    f_etc_non = b[5].checkbox("기타(비)", value=f_bi, key="f_etc_non")
+    bi_subs = ["f_sang", "f_gong", "f_build", "f_jisik", "f_etc_non"]
+    f_bi = b[0].checkbox("비주거용", key="f_bi", on_change=toggle_group, args=("f_bi", bi_subs))
+    f_sang = b[1].checkbox("상가/사무실", key="f_sang")
+    f_gong = b[2].checkbox("공장/창고", key="f_gong")
+    f_build = b[3].checkbox("빌딩/건물", key="f_build")
+    f_jisik = b[4].checkbox("지식산업센터", key="f_jisik")
+    f_etc_non = b[5].checkbox("기타", key="f_etc_non")
 
-    # 토지
+    # 3. 토지 필터
     l = st.columns([1, 1, 1, 1, 1, 1.5])
-    f_to = l[0].checkbox("🔴 토지", key="f_to")
-    f_dae = l[1].checkbox("대지", value=f_to, key="f_dae")
-    f_imya = l[2].checkbox("임야", value=f_to, key="f_imya")
-    f_nong = l[3].checkbox("농지", value=f_to, key="f_nong")
-    f_etc_land = l[4].checkbox("기타(토)", value=f_to, key="f_etc_land")
+    to_subs = ["f_dae", "f_imya", "f_nong", "f_etc_land"]
+    f_to = l[0].checkbox("토지", key="f_to", on_change=toggle_group, args=("f_to", to_subs))
+    f_dae = l[1].checkbox("대지", key="f_dae")
+    f_imya = l[2].checkbox("임야", key="f_imya")
+    f_nong = l[3].checkbox("농지", key="f_nong")
+    f_etc_land = l[4].checkbox("기타", key="f_etc_land")
 
     st.divider()
     m = st.columns([1.5, 1.5, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7])
     f_sell_rent = m[0].checkbox("매도/임대", key="f_sell_rent")
     f_buy_lease = m[1].checkbox("매수/임차", key="f_buy_lease")
     f_r1, f_r2, f_r3, f_r4 = m[2].checkbox("방1"), m[3].checkbox("방2"), m[4].checkbox("방3"), m[5].checkbox("방4")
-    f_b1, f_b2, f_b3 = m[6].checkbox("욕1"), m[7].checkbox("욕2"), m[8].checkbox("욕3")
+    f_b1, f_b2, f_b3 = m[6].checkbox("화1"), m[7].checkbox("화2"), m[8].checkbox("화3")
 
 # 필터링 엔진
 df_f = st.session_state.data.copy()
@@ -147,7 +151,7 @@ for check, val in sub_map.items():
 if active_subs:
     df_f = df_f[df_f['item_sub_category'].isin(active_subs)]
 
-# 의뢰목적 필터
+# 의뢰목적 필터 (매도/임대 등)
 active_purps = []
 if f_sell_rent: active_purps.extend(["매도", "임대"])
 if f_buy_lease: active_purps.extend(["매수", "임차"])
