@@ -4,45 +4,53 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 레이아웃 (기존 고정값 유지) ---
+# --- 1. 페이지 설정 및 레이아웃 (최적화된 고정값) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
+    /* 전체 여백 최소화 */
     .block-container {
         padding: 1rem 2rem !important;
         max-width: 100% !important;
     }
 
-    /* 좌측 750px 고정 Grid */
+    /* 좌측 750px 고정 Grid - 다른 요소에 영향 안 주도록 설정 */
     [data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: minmax(400px, 750px) 1fr !important; 
+        grid-template-columns: 750px 1fr !important; 
         gap: 2rem !important;
         align-items: start !important;
     }
 
     [data-testid="column"]:nth-of-type(1) {
-        width: 100% !important;
+        width: 750px !important;
         max-width: 750px !important;
         flex: none !important;
     }
 
-    /* 라디오 버튼 정렬 (가로로 예쁘게 배치) */
+    /* 라디오 버튼 간격 및 정렬을 아주 촘촘하게 수정 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 10px !important;
+        gap: 8px !important; /* 간격을 더 줄였습니다 */
+        margin-bottom: -10px !important; /* 아래 요소와의 불필요한 간격 제거 */
     }
     
     div[role="radiogroup"] label {
+        margin-right: 5px !important;
         white-space: nowrap !important;
+    }
+
+    /* 입력창들 사이의 너무 넓은 간격 조정 */
+    [data-testid="stVerticalBlock"] > div {
+        padding-bottom: 0px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 로직 (기존 유지) ---
+# --- 2. 데이터 로직 (절대 수정 없음) ---
 DB_FILE = "property_data.csv"
 def load_data():
     if os.path.exists(DB_FILE):
@@ -69,7 +77,7 @@ col_reg, col_list = st.columns([1, 1])
 with col_reg:
     st.subheader("📍 매물 등록")
     
-    # 대분류 (반응형을 위해 폼 외부 유지)
+    # 대분류
     reg_cat = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
     
     subs = {
@@ -81,7 +89,7 @@ with col_reg:
     with st.form("reg_form", clear_on_submit=True):
         reg_date = st.date_input("접수일", datetime.now())
         
-        # [수정 포인트] 소분류를 라디오 버튼으로 변경
+        # 소분류 (요청하신 라디오 버튼 방식)
         reg_sub = st.radio("물건 소분류", subs[reg_cat], horizontal=True)
         
         reg_purp = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
@@ -113,4 +121,5 @@ with col_reg:
 
 with col_list:
     st.subheader("📋 매물 목록")
+    # 목록 부분은 건드리지 않았습니다.
     st.dataframe(st.session_state.data.iloc[::-1], use_container_width=True, hide_index=True)
