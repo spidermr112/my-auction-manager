@@ -49,42 +49,39 @@ def init_db():
 
 conn = init_db()
 
-# 3. 사이드바: 매물 등록 기능 (주거/비주거 소분류 로직 포함)
+# 3. 사이드바: 매물 등록 기능
 with st.sidebar:
-    with st.form("input_form", clear_on_submit=True):
-        # 접수일
-        receipt_date = st.date_input("접수일", value=datetime.now())
+    # 💡 [핵심] 즉각적인 소분류 업데이트를 위해 선택창을 Form 바깥에 배치합니다.
+    st.subheader("📋 신규 등록")
+    receipt_date = st.date_input("접수일", value=datetime.now())
+    
+    # 대분류 선택 (즉시 Rerun 발생)
+    main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
+    
+    # 대분류에 따른 소분류 목록 정의
+    if main_category == "주거용":
+        sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
+    elif main_category == "비주거용":
+        sub_options = ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"]
+    else:
+        sub_options = ["토지/대지", "임야/전답", "잡종지", "창고용지", "기타"]
         
-        # [핵심] 물건 대분류 선택
-        main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
-        
-        # [핵심] 대분류에 따른 소분류 리스트 정의
-        if main_category == "주거용":
-            sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택/숙박"]
-        elif main_category == "비주거용":
-            # 대표적인 비주거용 부동산 목록
-            sub_options = ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"]
-        else:
-            # 기타/토지류
-            sub_options = ["토지/대지", "임야/전답", "잡종지", "창고용지", "기타"]
-            
-        item_type = st.selectbox("물건 소분류", sub_options)
+    item_type = st.selectbox("물건 소분류", sub_options)
 
-        # 주소 정보
+    # 나머지 입력 항목들은 기존처럼 Form으로 묶어 한 번에 저장합니다.
+    with st.form("remaining_form", clear_on_submit=True):
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
         address_detail = st.text_input("상세 주소")
         full_address = f"{address_city} {address_detail}"
         
-        # 거래 정보
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
         
-        # 상세 정보
         rooms = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상", "해당없음"])
         area = st.text_input("공급/전용 면적")
         notes = st.text_area("특약사항 및 분석내용")
         
-        submit_button = st.form_submit_button("DB에 저장하기")
+        submit_button = st.form_submit_button("🏠 DB에 저장하기")
 
     if submit_button:
         reg_date = datetime.now().strftime("%Y-%m-%d")
@@ -95,18 +92,16 @@ with st.sidebar:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (reg_date, r_date_str, main_category, item_type, full_address, category, price, rooms, area, notes))
         conn.commit()
-        st.success(f"[{main_category}] {item_type} 저장 완료!")
+        st.success(f"성공적으로 저장되었습니다!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
-# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 통합 검색 기능 (AND 검색 지원)
-search_query = st.text_input("🔍 통합 검색 (예: '비주거용 상가' 입력 시 동시 검색 가능)")
+search_query = st.text_input("🔍 통합 검색 (예: '비주거용 남양주' 입력 시 두 단어 모두 포함된 행 검색)")
 
 if search_query:
     keywords = search_query.split()
@@ -145,4 +140,13 @@ with col1:
 
 with col2:
     csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 전체 백업(CSV)", data=csv, file_name="auction_backup.csv")
+    st.download_button("📥 전체 백업(CSV)", data=csv, file_name="auction_data.csv")
+
+---
+
+### 🛠 수정된 핵심 포인트
+1.  **Form 분리:** `물건 대분류`와 `물건 소분류` 선택창을 `st.form` 바깥으로 뺐습니다. 이제 대분류를 바꾸는 순간 즉시 화면이 새로고침되면서 소분류 목록이 바뀝니다.
+2.  **동적 리스트 로직:** 사용자가 선택한 `main_category` 값에 따라 `sub_options` 변수가 실시간으로 정의됩니다.
+3.  **데이터 무결성:** 대분류와 소분류가 따로 저장되므로, 나중에 엑셀 백업이나 데이터 분석을 할 때 분류별로 정렬하기가 매우 수월해집니다.
+
+이제 이 코드를 실행하면 첨부해주신 이미지 속의 시스템이 훨씬 지능적으로 작동할 거예요! 추가로 궁금한 점이 있으신가요?
