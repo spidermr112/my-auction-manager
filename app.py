@@ -4,19 +4,17 @@ import pandas as pd
 import re
 from datetime import datetime
 
-# 1. 페이지 설정 및 엔터 키/커서 제어 스크립트
+# 1. 페이지 설정 및 엔터 키 제어
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
-# 세션 상태 초기화 (소분류 및 의뢰목적 복수 저장을 위함)
+# 세션 상태 초기화
 if 'item_type_list' not in st.session_state:
     st.session_state.item_type_list = []
 if 'goals_list' not in st.session_state:
     st.session_state.goals_list = []
 
-# 한글 금액 변환 함수
 def format_korean_price(price_manwon):
-    if price_manwon is None or price_manwon == 0:
-        return "0원"
+    if price_manwon is None or price_manwon == 0: return "0원"
     eok = price_manwon // 10000
     man = price_manwon % 10000
     result = []
@@ -38,23 +36,13 @@ st.markdown("""
     });
     </script>
     <style>
+    /* 입력창 커서 및 스타일 */
     input, div[data-baseweb="select"], textarea, .stNumberInput { cursor: default !important; }
     [data-testid="stSidebar"] * { cursor: default !important; }
-    /* 태그 스타일 */
-    .sel-tag {
-        display: inline-block;
-        background-color: #e1e4e8;
-        border-radius: 5px;
-        padding: 2px 8px;
-        margin-right: 5px;
-        margin-bottom: 5px;
-        font-size: 14px;
-        border: 1px solid #ccc;
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 초기화
+# 2. DB 초기화
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
@@ -77,33 +65,32 @@ with st.sidebar:
     st.subheader("🏠 매물 등록")
     
     receipt_date = st.date_input("접수일", value=datetime.now())
-    main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
-    # ------------------------------------------------------------------
-    # [업그레이드] 물건 소분류 (클릭 즉시 닫히는 복수 선택기)
+    # [수정] 물건 대분류를 라디오 버튼 스타일로 변경
+    main_category = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
+    
+    # 대분류 변경 시 소분류 리스트 자동 갱신을 위한 로직
     sub_map = {
         "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
         "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
         "토지": ["토지"]
     }
     
-    # 드롭다운에서 하나 선택 시 즉시 닫힘
+    # 소분류 추가 (하나 클릭 시 즉시 닫힘)
     selected_item = st.selectbox("물건 소분류 추가", ["선택하세요"] + sub_map[main_category])
     if selected_item != "선택하세요":
         if selected_item not in st.session_state.item_type_list:
             st.session_state.item_type_list.append(selected_item)
     
-    # 선택된 항목들 태그로 표시
     if st.session_state.item_type_list:
         st.write("선택됨: " + " ".join([f"`{i}`" for i in st.session_state.item_type_list]))
-        if st.button("소분류 초기화", key="reset_sub"):
+        if st.button("소분류 초기화"):
             st.session_state.item_type_list = []
             st.rerun()
     
     item_type = ", ".join(st.session_state.item_type_list)
-    
-    # ------------------------------------------------------------------
-    # [업그레이드] 의뢰목적 (클릭 즉시 닫히는 복수 선택기)
+
+    # 의뢰목적 추가 (하나 클릭 시 즉시 닫힘)
     goal_options = ["매도", "임대", "매수", "임차", "교환"]
     selected_goal = st.selectbox("의뢰목적 추가", ["선택하세요"] + goal_options)
     if selected_goal != "선택하세요":
@@ -112,17 +99,17 @@ with st.sidebar:
             
     if st.session_state.goals_list:
         st.write("선택됨: " + " ".join([f"`{g}`" for g in st.session_state.goals_list]))
-        if st.button("목적 초기화", key="reset_goal"):
+        if st.button("목적 초기화"):
             st.session_state.goals_list = []
             st.rerun()
             
     request_goal = ", ".join(st.session_state.goals_list)
 
-    # ------------------------------------------------------------------
-    
+    # 임대/매매 여부 판단
     is_lease = any(x in st.session_state.goals_list for x in ["임대", "임차"])
     is_sale = any(x in st.session_state.goals_list for x in ["매도", "매수", "교환"])
 
+    # 주거용일 때만 세부 정보 활성화
     if main_category == "주거용":
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
@@ -130,15 +117,15 @@ with st.sidebar:
     else:
         category, room_count, bath_count = "", "", ""
 
+    # 금액 입력부
     deposit, monthly_rent, converted_deposit, price = 0, 0, 0, 0
-
     if is_lease:
         col1, col2 = st.columns(2)
         with col1: deposit = st.number_input("보증금 (만원)", min_value=0, value=None, step=100)
         with col2: monthly_rent = st.number_input("차임 (만원)", min_value=0, value=None, step=10)
-        calc_deposit = deposit if deposit is not None else 0
-        calc_rent = monthly_rent if monthly_rent is not None else 0
-        converted_deposit = calc_deposit + (calc_rent * 100)
+        c_dep = deposit if deposit is not None else 0
+        c_rent = monthly_rent if monthly_rent is not None else 0
+        converted_deposit = c_dep + (c_rent * 100)
         st.info(f"⚖️ **환산보증금: {format_korean_price(converted_deposit)}**")
 
     if is_sale:
@@ -150,14 +137,14 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
+    # 면적 자동 변환
     area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
     final_area = ""
     if area_raw:
         if "평" in area_raw:
             try:
-                num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
-                m2_val = round(num_part * 3.3058, 2)
-                final_area = f"{m2_val}㎡ ({num_part}평)"
+                num = float(re.findall(r"\d+\.?\d*", area_raw)[0])
+                final_area = f"{round(num * 3.3058, 2)}㎡ ({num}평)"
             except: final_area = area_raw
         else: final_area = f"{area_raw}㎡"
         st.info(f"📐 **최종 면적: {final_area}**")
@@ -180,7 +167,6 @@ with st.sidebar:
                   room_count, bath_count, address, category, price, 
                   deposit, monthly_rent, converted_deposit, final_area, notes))
             conn.commit()
-            # 저장 후 세션 리스트 초기화
             st.session_state.item_type_list = []
             st.session_state.goals_list = []
             st.success("✅ 저장이 완료되었습니다!")
@@ -196,12 +182,10 @@ if not df.empty:
     st.data_editor(
         df,
         column_config={
-            "id": None, 
-            "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
+            "id": None, "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
             "deposit": st.column_config.NumberColumn("보증금", format="%d"),
             "monthly_rent": st.column_config.NumberColumn("차임", format="%d"),
             "converted_deposit": st.column_config.NumberColumn("환산보증금", format="%d"),
-            "area": "면적"
         },
-        num_rows="dynamic", use_container_width=True, key="main_editor"
+        num_rows="dynamic", use_container_width=True
     )
