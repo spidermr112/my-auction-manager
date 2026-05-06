@@ -4,63 +4,55 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 레이아웃 박제 (CSS) ---
+# --- 1. 페이지 설정 및 프레임 규격 고정 (핵심 수정) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 전체 여백 최적화 */
+    /* 1. 전체 컨테이너 설정 */
     .block-container {
-        padding: 1.5rem 2rem !important;
+        padding: 1.5rem 1rem !important;
         max-width: 100% !important;
     }
 
-    /* 2. 좌측(400px 고정) / 우측(가변 확장) 레이아웃 강제 고정 */
+    /* 2. 좌우 프레임을 비율이 아닌 '고정 너비'와 '가변 너비'로 분리 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 2rem !important;
+        gap: 1.5rem !important;
     }
 
-    /* 좌측 컬럼: 400px 절대값 박제 */
+    /* [매물 등록 프레임] 브라우저 크기와 무관하게 380px로 완전 고정 */
     [data-testid="column"]:nth-of-type(1) {
-        flex: 0 0 400px !important;
-        width: 400px !important;
-        min-width: 400px !important;
-        max-width: 400px !important;
+        flex: 0 0 380px !important;
+        width: 380px !important;
+        min-width: 380px !important;
+        max-width: 380px !important;
     }
 
-    /* 우측 컬럼: 나머지 무한 확장 */
+    /* [매물 목록 프레임] 나머지 모든 공간을 자동으로 채움 */
     [data-testid="column"]:nth-of-type(2) {
         flex: 1 1 auto !important;
         min-width: 0 !important;
     }
 
-    /* 3. 라디오 버튼 벌어짐 방지 (대표님이 지적하신 핵심 부분) */
+    /* 3. 프레임 내부 요소(라디오 버튼 등)가 벌어지지 않게 정렬 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        justify-content: flex-start !important; /* 왼쪽으로 딱 붙임 */
-        gap: 15px !important; /* 항목 간 간격을 일정하게 유지 */
+        justify-content: flex-start !important;
+        gap: 10px !important;
     }
-
-    /* 라디오 버튼 각각의 항목이 넓게 퍼지지 않도록 설정 */
-    div[role="radiogroup"] > label {
-        flex: 0 0 auto !important; 
-        width: auto !important;
-        margin-right: 5px !important;
-    }
-
-    /* 4. 입력창 및 버튼 너비가 박스(400px)를 넘지 않게 조정 */
-    .stTextInput, .stTextArea, .stDateInput, .stButton {
-        width: 100% !important;
+    div[role="radiogroup"] label {
+        flex: 0 0 auto !important;
+        margin-right: 10px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기능 일절 수정 없음) ---
+# --- 2. 데이터 관리 로직 (절대 수정 금지) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -108,8 +100,8 @@ def parse_flexible_price(price_str):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# --- 3. 화면 구성 ---
-col_reg, col_list = st.columns([1, 4]) # CSS에서 강제 조정하므로 비율 의미 없음
+# --- 3. 화면 배치 (CSS로 제어하므로 인자값 무의미함) ---
+col_reg, col_list = st.columns([1, 1]) 
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
@@ -128,7 +120,7 @@ with col_reg:
         
         if reg_cat == "주거용":
             c1, c2 = st.columns(2)
-            with c1: reg_room = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
+            with c1: reg_room = st.radio("방 개수", ["방1", "방2", "방3", "방4↑"], horizontal=True)
             with c2: reg_bath = st.radio("화장실", ["화장실1", "화장실2", "화장실3↑"], horizontal=True)
         else:
             reg_room, reg_bath = "", ""
