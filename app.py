@@ -43,10 +43,8 @@ if check_password():
     def save_data(df):
         df.to_excel(EXCEL_FILE, index=False)
 
-    # 탭 구성
-    tab1, tab2 = st.tabs(["🆕 새 매물 등록", "🛠 매물 수정 및 삭제"])
-
-    with tab1:
+    # --- 상단: 새 매물 등록 폼 ---
+    with st.expander("➕ 새 매물 등록하기", expanded=True):
         with st.form("input_form", clear_on_submit=True):
             col1, col2 = st.columns(2)
             with col1:
@@ -69,60 +67,43 @@ if check_password():
                 df = load_data()
                 df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
                 save_data(df)
-                st.success("✅ 저장 완료!")
+                st.success("✅ 신규 매물이 등록되었습니다!")
                 st.rerun()
 
-    with tab2:
-        df = load_data()
-        if not df.empty:
-            st.subheader("📋 데이터 관리 (수정/삭제)")
-            col_edit, col_del = st.columns(2)
-            
-            with col_del:
-                st.write("🗑️ **데이터 삭제**")
-                del_idx = st.number_input("삭제할 행 번호(Index) 입력", min_value=0, max_value=len(df)-1, step=1)
-                if st.button("선택한 행 삭제"):
-                    df = df.drop(df.index[del_idx]).reset_index(drop=True)
-                    save_data(df)
-                    st.warning(f"⚠️ {del_idx}번 행이 삭제되었습니다.")
-                    st.rerun()
-
-            with col_edit:
-                st.write("✏️ **데이터 수정**")
-                edit_idx = st.number_input("수정할 행 번호(Index) 입력", min_value=0, max_value=len(df)-1, step=1)
-                if st.button("해당 데이터 불러오기"):
-                    st.session_state['edit_data'] = df.iloc[edit_idx].to_dict()
-                    st.session_state['edit_idx'] = edit_idx
-
-            if 'edit_data' in st.session_state:
-                st.markdown("---")
-                with st.form("edit_form"):
-                    e_data = st.session_state['edit_data']
-                    st.write(f"🔄 **{st.session_state['edit_idx']}번 매물 수정 중**")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        u_case = st.text_input("사건번호", value=e_data.get('사건번호', ''))
-                        u_addr = st.text_input("소재지", value=e_data.get('주소', ''))
-                    with col2:
-                        u_price = st.text_input("거래가액", value=e_data.get('거래가액', ''))
-                        u_memo = st.text_area("비고", value=e_data.get('비고', ''))
-                    
-                    if st.form_submit_button("수정 내용 적용"):
-                        df.at[st.session_state['edit_idx'], '사건번호'] = u_case
-                        df.at[st.session_state['edit_idx'], '주소'] = u_addr
-                        df.at[st.session_state['edit_idx'], '거래가액'] = u_price
-                        df.at[st.session_state['edit_idx'], '비고'] = u_memo
-                        save_data(df)
-                        del st.session_state['edit_data']
-                        st.success("✅ 수정 완료!")
-                        st.rerun()
-
-    # 목록 표시
+    # --- 하단: 직관적인 편집기 (에디터) ---
     df = load_data()
     if not df.empty:
         st.markdown("---")
-        st.subheader("📊 전체 매물 목록")
-        search = st.text_input("🔍 검색 (사건번호, 주소 등)")
+        st.subheader("📝 매물 목록 편집기")
+        st.info("💡 표 안의 내용을 클릭해서 직접 수정하거나, 행을 선택하고 [Delete] 키로 삭제할 수 있습니다.")
+        
+        # 통합 검색 기능 유지
+        search = st.text_input("🔍 검색어 입력")
+        display_df = df.copy()
         if search:
-            df = df[df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
-        st.dataframe(df, use_container_width=True)
+            display_df = display_df[display_df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
+
+        # 엑셀처럼 수정 가능한 데이터 에디터 호출
+        edited_df = st.data_editor(
+            display_df,
+            use_container_width=True,
+            num_rows="dynamic", # 행 삭제 및 추가 가능
+            hide_index=False,
+            column_config={
+                "접수일자": st.column_config.Column(disabled=True) # 날짜는 자동입력이니 수정 불가 설정
+            }
+        )
+
+        # 변경 사항 저장 버튼
+        if st.button("💾 변경된 내용 모두 저장하기"):
+            # 검색 필터가 걸린 상태에서 수정했을 경우를 대비해 원본과 병합 로직
+            if search:
+                df.update(edited_df)
+            else:
+                df = edited_df
+                
+            save_data(df)
+            st.success("✅ 모든 변경 사항이 엑셀 파일에 저장되었습니다!")
+            st.rerun()
+    else:
+        st.info("데이터가 없습니다. 상단에서 매물을 먼저 등록해 보세요.")
