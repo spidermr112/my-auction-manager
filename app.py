@@ -60,36 +60,23 @@ with st.sidebar:
     
     receipt_date = st.date_input("접수일", value=datetime.now())
     
-    # [대분류]
+    # [대분류] 라디오 버튼
     main_category = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
     
+    # [소분류] 라디오 버튼
     sub_map = {
         "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
         "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
         "토지": ["토지"]
     }
+    item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
 
-    # --- [개선] 물건 소분류 복수선택 로직 ---
-    multi_sub = st.checkbox("소분류 복수선택")
-    if multi_sub:
-        selected_subs = st.multiselect("소분류 선택", sub_map[main_category])
-        item_type = ", ".join(selected_subs)
-    else:
-        item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
+    # [의뢰목적] 라디오 버튼 (복수선택 제거하여 깔끔하게 통일)
+    request_goal = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
 
-    # --- [개선] 의뢰목적 복수선택 로직 ---
-    goal_options = ["매도", "임대", "매수", "임차", "교환"]
-    multi_goal = st.checkbox("의뢰목적 복수선택")
-    if multi_goal:
-        selected_goals = st.multiselect("의뢰목적 선택", goal_options)
-        request_goal = ", ".join(selected_goals)
-        # 임대/매매 여부 판단 (복수 선택 시 하나라도 포함되면 True)
-        is_lease = any(x in selected_goals for x in ["임대", "임차"])
-        is_sale = any(x in selected_goals for x in ["매도", "매수", "교환"])
-    else:
-        request_goal = st.radio("의뢰목적", goal_options, horizontal=True)
-        is_lease = request_goal in ["임대", "임차"]
-        is_sale = request_goal in ["매도", "매수", "교환"]
+    # 임대/매매 여부 판단
+    is_lease = request_goal in ["임대", "임차"]
+    is_sale = request_goal in ["매도", "매수", "교환"]
 
     # 주거용 부가 정보
     if main_category == "주거용":
@@ -101,7 +88,6 @@ with st.sidebar:
 
     # 금액 입력부
     deposit, monthly_rent, converted_deposit, price = 0, 0, 0, 0
-    
     if is_lease:
         col1, col2 = st.columns(2)
         with col1: deposit = st.number_input("보증금 (만원)", min_value=0, value=None, step=100)
@@ -117,6 +103,7 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
+    # 면적 자동 변환
     area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
     final_area = ""
     if area_raw:
