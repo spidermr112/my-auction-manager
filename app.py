@@ -110,24 +110,25 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
-    # --- [핵심 수정] 면적 자동 입력 및 변환 로직 ---
-    area_raw = st.text_input("면적 입력 (예: 30평)", placeholder="숫자만 쓰거나 '30평' 입력 후 엔터")
+    # --- [수정 포인트] 면적 입력 인터페이스 일관성 개선 ---
+    area_raw = st.text_input("면적 입력 (숫자+평 또는 m2)", placeholder="예: 30평 / 100")
     
-    calculated_val = ""
+    final_area = ""
     if area_raw:
         if "평" in area_raw:
             try:
                 num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
                 m2_val = round(num_part * 3.3058, 2)
-                calculated_val = f"{m2_val}㎡ ({num_part}평)"
+                final_area = f"{m2_val}㎡ ({num_part}평)"
             except:
-                calculated_val = area_raw
+                final_area = area_raw
         else:
-            calculated_val = area_raw
-
-    # 계산된 값이 있으면 자동으로 채워지고, 없으면 빈칸
-    final_area = st.text_input("최종 저장 면적 (자동 생성됨)", value=calculated_val)
-    # ----------------------------------------------
+            # 숫자만 입력한 경우 단위를 붙여줌
+            final_area = f"{area_raw}㎡"
+        
+        # 수정 불가능한 안내 칸으로 표시 (환산보증금과 동일한 스타일)
+        st.info(f"📐 **최종 저장 면적: {final_area}**")
+    # --------------------------------------------------
             
     notes = st.text_area("특약사항 및 분석내용")
     
@@ -160,10 +161,12 @@ if not df.empty:
     st.data_editor(
         df,
         column_config={
-            "id": None, "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
+            "id": None, 
+            "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
             "deposit": st.column_config.NumberColumn("보증금", format="%d"),
             "monthly_rent": st.column_config.NumberColumn("차임", format="%d"),
             "converted_deposit": st.column_config.NumberColumn("환산보증금", format="%d"),
+            "area": "면적"
         },
         num_rows="dynamic", use_container_width=True, key="main_editor"
     )
