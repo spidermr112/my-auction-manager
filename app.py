@@ -8,12 +8,17 @@ st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide"
 
 st.markdown("""
     <style>
+    /* 모든 입력창, 셀렉트박스, 텍스트 영역의 커서를 화살표(default)로 고정 */
     input, div[data-baseweb="select"], textarea, .stNumberInput {
         cursor: default !important;
     }
+    
+    /* 입력창 내부의 실제 텍스트 입력 영역도 화살표로 변경 */
     input::placeholder, textarea::placeholder {
         cursor: default !important;
     }
+
+    /* 사이드바 내부의 입력 필드들에 대해서도 강제 적용 */
     [data-testid="stSidebar"] * {
         cursor: default !important;
     }
@@ -44,33 +49,37 @@ def init_db():
 
 conn = init_db()
 
-# 3. 사이드바: 매물 등록 기능 (물건종류 그룹화 적용)
+# 3. 사이드바: 매물 등록 기능 (주거/비주거 소분류 로직 포함)
 with st.sidebar:
     with st.form("input_form", clear_on_submit=True):
+        # 접수일
         receipt_date = st.date_input("접수일", value=datetime.now())
         
-        # --- 물건종류 그룹화 로직 ---
-        # 1단계: 큰 분류 선택
+        # [핵심] 물건 대분류 선택
         main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
         
-        # 2단계: 대분류에 따른 세부 종류 설정
+        # [핵심] 대분류에 따른 소분류 리스트 정의
         if main_category == "주거용":
-            sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
+            sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택/숙박"]
         elif main_category == "비주거용":
-            sub_options = ["상가/근린시설", "사무실", "공장/창고", "지식산업센터", "숙박시설"]
+            # 대표적인 비주거용 부동산 목록
+            sub_options = ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"]
         else:
-            sub_options = ["토지", "임야", "잡종지", "기타"]
+            # 기타/토지류
+            sub_options = ["토지/대지", "임야/전답", "잡종지", "창고용지", "기타"]
             
         item_type = st.selectbox("물건 소분류", sub_options)
-        # --------------------------
 
+        # 주소 정보
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
         address_detail = st.text_input("상세 주소")
         full_address = f"{address_city} {address_detail}"
         
+        # 거래 정보
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
         
+        # 상세 정보
         rooms = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상", "해당없음"])
         area = st.text_input("공급/전용 면적")
         notes = st.text_area("특약사항 및 분석내용")
@@ -93,9 +102,11 @@ with st.sidebar:
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
+# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-search_query = st.text_input("🔍 통합 검색 (예: '주거용 남양주' 입력 시 대분류와 지역 동시 검색)")
+# 통합 검색 기능 (AND 검색 지원)
+search_query = st.text_input("🔍 통합 검색 (예: '비주거용 상가' 입력 시 동시 검색 가능)")
 
 if search_query:
     keywords = search_query.split()
