@@ -6,7 +6,7 @@ from datetime import datetime
 # 1. 페이지 설정 및 엔터 키 동작 제어 스크립트
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
-# [추가] 만원 단위 숫자를 한글(억, 만원)로 변환하는 함수
+# 만원 단위 숫자를 한글(억, 만원)로 변환하는 함수
 def format_korean_price(price_manwon):
     if price_manwon is None or price_manwon == 0:
         return ""
@@ -18,7 +18,7 @@ def format_korean_price(price_manwon):
     if eok > 0:
         result.append(f"{int(eok)}억")
     if man > 0:
-        result.append(f"{int(man):,}만원") # 천단위 쉼표 포함
+        result.append(f"{int(man):,}만원")
     
     return " ".join(result)
 
@@ -73,8 +73,12 @@ with st.sidebar:
         sub_options = ["토지"]
     item_type = st.selectbox("물건 소분류", sub_options)
 
+    # --- [수정] 의뢰목적 복수 선택 기능 (multiselect) ---
     if main_category == "주거용":
-        request_goal = st.radio("의뢰목적", ["매수/임차", "매도/임대"], horizontal=True)
+        # 리스트 형태로 선택받음
+        goals = st.multiselect("의뢰목적 (복수 선택 가능)", ["매도", "임대", "매수", "임차"])
+        request_goal = ", ".join(goals) # DB 저장을 위해 쉼표로 연결된 문자열로 변환
+        
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
         bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
@@ -84,7 +88,6 @@ with st.sidebar:
     # 거래가액 입력
     price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100, placeholder="숫자 입력")
     
-    # [추가된 핵심 기능] 숫자를 입력하면 바로 아래에 한글 단위로 표시
     if price:
         st.info(f"💰 **한글 확인: {format_korean_price(price)}**")
 
@@ -115,8 +118,8 @@ if not df.empty:
         df,
         column_config={
             "id": None, "reg_date": "등록일", "receipt_date": "접수일", 
-            "item_category": "대분류", "item_type": "물건종류", 
-            "price": st.column_config.NumberColumn("가액(만원)", format="%d") # 소수점 제거
+            "item_category": "대분류", "item_type": "물건종류", "request_goal": "의뢰목적",
+            "price": st.column_config.NumberColumn("가액(만원)", format="%d")
         },
         num_rows="dynamic", use_container_width=True
     )
