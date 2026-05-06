@@ -70,40 +70,55 @@ if check_password():
                 st.success("✅ 신규 매물이 등록되었습니다!")
                 st.rerun()
 
-    # --- 하단: 직관적인 편집기 (에디터) ---
+    # --- 하단: 즉시 저장 에디터 & 되돌리기 보험 ---
     df = load_data()
     if not df.empty:
         st.markdown("---")
-        st.subheader("📝 매물 목록 편집기")
-        st.info("💡 표 안의 내용을 클릭해서 직접 수정하거나, 행을 선택하고 [Delete] 키로 삭제할 수 있습니다.")
+        col_title, col_undo = st.columns([3, 1])
+        with col_title:
+            st.subheader("📝 매물 목록 관리 (즉시 저장 모드)")
         
-        # 통합 검색 기능 유지
+        # [보험 기능] 되돌리기 버튼
+        with col_undo:
+            if "last_df" in st.session_state:
+                if st.button("⏪ 방금 수정한 내용 되돌리기"):
+                    save_data(st.session_state["last_df"])
+                    del st.session_state["last_df"]
+                    st.success("데이터를 복구했습니다!")
+                    st.rerun()
+
+        st.info("💡 수정하거나 삭제(행 선택 후 Delete)하면 즉시 엑셀에 반영됩니다.")
+        
         search = st.text_input("🔍 검색어 입력")
         display_df = df.copy()
         if search:
             display_df = display_df[display_df.astype(str).apply(lambda x: x.str.contains(search, case=False)).any(axis=1)]
 
-        # 엑셀처럼 수정 가능한 데이터 에디터 호출
+        # 데이터 에디터 (수정 시 즉시 트리거)
         edited_df = st.data_editor(
             display_df,
             use_container_width=True,
-            num_rows="dynamic", # 행 삭제 및 추가 가능
+            num_rows="dynamic",
             hide_index=False,
-            column_config={
-                "접수일자": st.column_config.Column(disabled=True) # 날짜는 자동입력이니 수정 불가 설정
-            }
+            key="main_editor",
+            column_config={"접수일자": st.column_config.Column(disabled=True)}
         )
 
-        # 변경 사항 저장 버튼
-        if st.button("💾 변경된 내용 모두 저장하기"):
-            # 검색 필터가 걸린 상태에서 수정했을 경우를 대비해 원본과 병합 로직
+        # 수정이 감지되었을 때 자동 저장 로직
+        # 현재 화면의 데이터와 실제 저장된 데이터가 다를 경우에만 실행
+        if not edited_df.equals(display_df):
+            # 되돌리기용으로 현재 상태를 저장
+            st.session_state["last_df"] = df.copy()
+            
+            # 실제 데이터 업데이트 및 저장
             if search:
                 df.update(edited_df)
             else:
                 df = edited_df
-                
+            
             save_data(df)
-            st.success("✅ 모든 변경 사항이 엑셀 파일에 저장되었습니다!")
-            st.rerun()
+            st.toast("저장되었습니다!", icon="💾")
+            # st.rerun()을 쓰면 깜빡임이 생기므로 toast로 확인만 줌
+            
     else:
         st.info("데이터가 없습니다. 상단에서 매물을 먼저 등록해 보세요.")
