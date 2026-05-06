@@ -51,14 +51,15 @@ conn = init_db()
 
 # 3. 사이드바: 매물 등록 기능
 with st.sidebar:
-    # 💡 [핵심] 즉각적인 소분류 업데이트를 위해 선택창을 Form 바깥에 배치합니다.
     st.subheader("📋 신규 등록")
+    
+    # 💡 즉각적인 소분류 업데이트를 위해 선택창을 Form 바깥에 배치합니다.
     receipt_date = st.date_input("접수일", value=datetime.now())
     
-    # 대분류 선택 (즉시 Rerun 발생)
+    # 대분류 선택 (선택 즉시 앱이 Rerun되어 아래 소분류 목록을 갱신함)
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
     
-    # 대분류에 따른 소분류 목록 정의
+    # 대분류 값에 따른 소분류 목록 동적 설정
     if main_category == "주거용":
         sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
     elif main_category == "비주거용":
@@ -68,7 +69,7 @@ with st.sidebar:
         
     item_type = st.selectbox("물건 소분류", sub_options)
 
-    # 나머지 입력 항목들은 기존처럼 Form으로 묶어 한 번에 저장합니다.
+    # 나머지 항목들은 Form으로 묶어 한 번에 저장 처리
     with st.form("remaining_form", clear_on_submit=True):
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
         address_detail = st.text_input("상세 주소")
@@ -92,15 +93,17 @@ with st.sidebar:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (reg_date, r_date_str, main_category, item_type, full_address, category, price, rooms, area, notes))
         conn.commit()
-        st.success(f"성공적으로 저장되었습니다!")
+        st.success(f"데이터가 저장되었습니다!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
+# 전체 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
+# 통합 검색 기능 (띄어쓰기 AND 검색 지원)
 search_query = st.text_input("🔍 통합 검색 (예: '비주거용 남양주' 입력 시 두 단어 모두 포함된 행 검색)")
 
 if search_query:
@@ -119,7 +122,7 @@ st.write(f"📊 검색 결과: {len(display_df)} 건")
 edited_df = st.data_editor(
     display_df,
     column_config={
-        "id": None,
+        "id": None, # ID 숨김
         "receipt_date": st.column_config.TextColumn("접수일"),
         "item_category": st.column_config.TextColumn("대분류"),
         "item_type": st.column_config.TextColumn("물건종류"),
@@ -134,19 +137,11 @@ edited_df = st.data_editor(
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
+        # 편집된 내용을 DB에 덮어쓰기
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
         st.success("반영되었습니다!")
         st.rerun()
 
 with col2:
     csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 전체 백업(CSV)", data=csv, file_name="auction_data.csv")
-
----
-
-### 🛠 수정된 핵심 포인트
-1.  **Form 분리:** `물건 대분류`와 `물건 소분류` 선택창을 `st.form` 바깥으로 뺐습니다. 이제 대분류를 바꾸는 순간 즉시 화면이 새로고침되면서 소분류 목록이 바뀝니다.
-2.  **동적 리스트 로직:** 사용자가 선택한 `main_category` 값에 따라 `sub_options` 변수가 실시간으로 정의됩니다.
-3.  **데이터 무결성:** 대분류와 소분류가 따로 저장되므로, 나중에 엑셀 백업이나 데이터 분석을 할 때 분류별로 정렬하기가 매우 수월해집니다.
-
-이제 이 코드를 실행하면 첨부해주신 이미지 속의 시스템이 훨씬 지능적으로 작동할 거예요! 추가로 궁금한 점이 있으신가요?
+    st.download_button("📥 전체 백업(CSV)", data=csv, file_name="auction_backup.csv")
