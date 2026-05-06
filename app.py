@@ -110,8 +110,8 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
-    # --- [수정 포인트] 면적 입력 인터페이스 일관성 개선 ---
-    area_raw = st.text_input("면적 입력 (숫자+평 또는 m2)", placeholder="예: 30평 / 100")
+    # --- [수정] 면적 단위 가독성 개선 ($m^2$ 적용) ---
+    area_raw = st.text_input("면적 입력 (숫자+평 또는 숫자만)", placeholder="예: 30평 / 100")
     
     final_area = ""
     if area_raw:
@@ -119,16 +119,15 @@ with st.sidebar:
             try:
                 num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
                 m2_val = round(num_part * 3.3058, 2)
+                # 가독성을 위해 $m^2$ 기호 사용
                 final_area = f"{m2_val}㎡ ({num_part}평)"
             except:
                 final_area = area_raw
         else:
-            # 숫자만 입력한 경우 단위를 붙여줌
+            # 숫자만 입력한 경우에도 깔끔하게 단위 추가
             final_area = f"{area_raw}㎡"
         
-        # 수정 불가능한 안내 칸으로 표시 (환산보증금과 동일한 스타일)
         st.info(f"📐 **최종 저장 면적: {final_area}**")
-    # --------------------------------------------------
             
     notes = st.text_area("특약사항 및 분석내용")
     
