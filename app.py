@@ -33,11 +33,39 @@ def create_empty_df():
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
 
+# --- 금액 한글 변환 함수 (핵심!) ---
+def parse_korean_price(price_str):
+    """'3억 5천' 또는 '3.5억' 등을 만원 단위 숫자로 변환"""
+    if not price_str: return 0
+    try:
+        # 숫자만 있으면 그대로 반환
+        if price_str.isdigit():
+            return int(price_str)
+        
+        result = 0
+        # '억' 단위 추출
+        eok_match = re.search(r'([\d\.]+)\s*억', price_str)
+        if eok_match:
+            result += float(eok_match.group(1)) * 10000
+        
+        # '천' 단위 추출 (억 뒤에 오는 천 또는 그냥 천)
+        cheon_match = re.search(r'([\d\.]+)\s*천', price_str)
+        if cheon_match:
+            result += float(cheon_match.group(1)) * 100
+            
+        # 만약 '억', '천'이 없는데 숫자만 섞여있는 경우 처리
+        if not eok_match and not cheon_match:
+            num_only = re.sub(r'[^0-9]', '', price_str)
+            return int(num_only) if num_only else 0
+            
+        return int(result)
+    except:
+        return 0
+
 # 세션 상태 초기화
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# 중복 클릭 방지 상태값
 if 'last_submit_time' not in st.session_state:
     st.session_state.last_submit_time = 0
 
@@ -72,22 +100,22 @@ with col_reg:
         else:
             reg_room, reg_bath = "N/A", "N/A"
         
-        reg_price = st.number_input("거래가액(만원)", min_value=0, step=100, key="k_price")
+        # [수정] 거래가액을 텍스트로 입력받음
+        reg_price_raw = st.text_input("거래가액(만원 또는 '3억 5천')", key="k_price_raw", help="'3억', '5천' 등 한글 입력이 가능합니다.")
         reg_addr = st.text_input("소재지 상세", key="k_addr")
-        
-        # [수정] 입력란 이름 변경 및 도움말 추가
-        reg_area_raw = st.text_input("면적(평 or ㎡ 둘다 가능)", key="k_area_raw", help="'평'을 붙여 입력하면 ㎡로 자동 변환됩니다.")
-        
+        reg_area_raw = st.text_input("면적(평 or ㎡ 둘다 가능)", key="k_area_raw")
         reg_desc = st.text_area("특약내용", key="k_desc")
         
         if st.button("🏠 데이터베이스 저장", use_container_width=True, key="k_save_btn"):
             current_time = time.time()
             
-            # [중복 클릭 방지] 2초 이내 재클릭 차단
             if current_time - st.session_state.last_submit_time > 2.0:
                 st.session_state.last_submit_time = current_time
                 
-                # 평 수 변환 로직 (특수문자 ㎡ 적용)
+                # 한글 금액 -> 숫자 변환
+                final_price = parse_korean_price(reg_price_raw)
+                
+                # 평 수 변환
                 final_area = reg_area_raw
                 if reg_area_raw and '평' in reg_area_raw:
                     try:
@@ -95,16 +123,15 @@ with col_reg:
                         if num_only:
                             pyung = float(num_only)
                             m2 = round(pyung * 3.3058, 2)
-                            final_area = f"{m2}㎡({pyung}평)" # 가독성 좋은 특수문자 사용
-                    except:
-                        pass
+                            final_area = f"{m2}㎡({pyung}평)"
+                    except: pass
                 
                 new_id = f"P_{int(current_time * 1000)}"
                 new_row = pd.DataFrame([{
                     "id": new_id, "receipt_date": reg_date, "item_category": reg_cat,
                     "item_sub_category": reg_sub, "purpose": reg_purp,
                     "trade_type": reg_trade, "room_count": reg_room,
-                    "bathroom_count": reg_bath, "price": reg_price,
+                    "bathroom_count": reg_bath, "price": final_price,
                     "address": reg_addr if reg_addr else "(미입력)", 
                     "area": final_area if final_area else "(미입력)", 
                     "description": reg_desc, "status": "진행중"
@@ -112,7 +139,7 @@ with col_reg:
                 
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
                 save_data(st.session_state.data)
-                st.success("매물이 안전하게 저장되었습니다.")
+                st.success(f"저장 완료! (입력 금액: {final_price}만원)")
                 time.sleep(0.5)
                 st.rerun()
 
