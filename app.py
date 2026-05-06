@@ -4,55 +4,44 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 프레임 규격 고정 (핵심 수정) ---
+# --- 1. 페이지 설정 및 완전히 다른 방식(Grid)으로 프레임 고정 ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 전체 컨테이너 설정 */
+    /* 전체 화면 여백 최적화 */
     .block-container {
-        padding: 1.5rem 1rem !important;
+        padding: 1.5rem 2rem !important;
         max-width: 100% !important;
     }
 
-    /* 2. 좌우 프레임을 비율이 아닌 '고정 너비'와 '가변 너비'로 분리 */
+    /* 1. 핵심 해결책: 기존 스트림릿의 비율 방식을 버리고 Grid 방식으로 강제 전환 */
     [data-testid="stHorizontalBlock"] {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        gap: 1.5rem !important;
+        display: grid !important;
+        grid-template-columns: 380px 1fr !important; /* 좌측 380px 절대 고정, 우측 남는 공간 전부(1fr) 차지 */
+        gap: 2rem !important;
+        align-items: start !important;
     }
 
-    /* [매물 등록 프레임] 브라우저 크기와 무관하게 380px로 완전 고정 */
-    [data-testid="column"]:nth-of-type(1) {
-        flex: 0 0 380px !important;
-        width: 380px !important;
-        min-width: 380px !important;
-        max-width: 380px !important;
-    }
-
-    /* [매물 목록 프레임] 나머지 모든 공간을 자동으로 채움 */
-    [data-testid="column"]:nth-of-type(2) {
-        flex: 1 1 auto !important;
+    /* 2. 스트림릿이 강제로 주입하는 가변 비율(%) 무력화 */
+    [data-testid="column"] {
+        width: 100% !important; 
+        max-width: 100% !important;
         min-width: 0 !important;
+        flex: none !important; /* 기존 Flexbox 설정 완전히 끄기 */
     }
 
-    /* 3. 프레임 내부 요소(라디오 버튼 등)가 벌어지지 않게 정렬 */
+    /* 3. 라디오 버튼 등 내부 요소 줄바꿈 및 정렬 고정 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        justify-content: flex-start !important;
         gap: 10px !important;
-    }
-    div[role="radiogroup"] label {
-        flex: 0 0 auto !important;
-        margin-right: 10px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (절대 수정 금지) ---
+# --- 2. 데이터 관리 로직 (절대 수정 없음) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -100,8 +89,8 @@ def parse_flexible_price(price_str):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# --- 3. 화면 배치 (CSS로 제어하므로 인자값 무의미함) ---
-col_reg, col_list = st.columns([1, 1]) 
+# --- 3. 화면 배치 ---
+col_reg, col_list = st.columns([1, 1]) # Grid가 통제하므로 이 수치는 더 이상 영향을 주지 못함
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
@@ -165,16 +154,4 @@ with col_list:
     
     df_f = st.session_state.data.copy()
     if s_query:
-        df_f = df_f[df_f.apply(lambda r: s_query in str(r.values), axis=1)]
-    if sel_subs:
-        df_f = df_f[df_f['item_sub_category'].isin(sel_subs)]
-    if sel_purps:
-        df_f = df_f[df_f['purpose'].isin(sel_purps)]
-    
-    st.dataframe(df_f.iloc[::-1], use_container_width=True, hide_index=True)
-
-    if st.button("🗑️ 전체 데이터 초기화"):
-        if st.checkbox("정말 삭제하시겠습니까?"):
-            st.session_state.data = create_empty_df()
-            save_data(st.session_state.data)
-            st.rerun()
+        df_
