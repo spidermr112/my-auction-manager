@@ -32,9 +32,7 @@ st.markdown("""
     <style>
     input, textarea, .stNumberInput { cursor: default !important; }
     [data-testid="stSidebar"] * { cursor: default !important; }
-    /* 체크박스 가로 나열을 위한 스타일 */
-    div[data-testid="stHorizontalBlock"] { margin-bottom: -10px; }
-    .stCheckbox { margin-bottom: -15px; }
+    div[data-testid="stWidgetLabel"] { font-weight: bold; margin-bottom: -5px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -73,26 +71,12 @@ with st.sidebar:
     }
     item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
 
-    # [의뢰목적] 복수 선택이 가능한 가로형 체크박스 스타일
-    st.write("**의뢰목적 (복수 선택 가능)**")
-    goal_cols = st.columns(3)
-    g1 = goal_cols[0].checkbox("매도")
-    g2 = goal_cols[1].checkbox("임대")
-    g3 = goal_cols[2].checkbox("매수")
-    g4 = goal_cols[0].checkbox("임차")
-    g5 = goal_cols[1].checkbox("교환")
-    
-    goals = []
-    if g1: goals.append("매도")
-    if g2: goals.append("임대")
-    if g3: goals.append("매수")
-    if g4: goals.append("임차")
-    if g5: goals.append("교환")
-    request_goal = ", ".join(goals)
+    # [수정] 의뢰목적도 라디오 버튼으로 통일 (일관성 강조)
+    request_goal = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
 
     # 임대/매매 여부 판단
-    is_lease = any(x in goals for x in ["임대", "임차"])
-    is_sale = any(x in goals for x in ["매도", "매수", "교환"])
+    is_lease = request_goal in ["임대", "임차"]
+    is_sale = request_goal in ["매도", "매수", "교환"]
 
     # 주거용 부가 정보
     if main_category == "주거용":
@@ -102,8 +86,10 @@ with st.sidebar:
     else:
         category, room_count, bath_count = "", "", ""
 
-    # 금액 입력
+    # 금액 입력부
     deposit, monthly_rent, converted_deposit, price = 0, 0, 0, 0
+    
+    # 1. 임대/임차 선택 시
     if is_lease:
         col1, col2 = st.columns(2)
         with col1: deposit = st.number_input("보증금 (만원)", min_value=0, value=None, step=100)
@@ -113,17 +99,15 @@ with st.sidebar:
         converted_deposit = c_dep + (c_rent * 100)
         st.info(f"⚖️ **환산보증금: {format_korean_price(converted_deposit)}**")
 
+    # 2. 매도/매수/교환 선택 시 거래가액 표시
     if is_sale:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
         if price: st.info(f"💰 **거래가액 확인: {format_korean_price(price)}**")
-    
-    # 아무것도 선택 안했을 때 기본창
-    if not goals:
-        price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
 
     address = st.text_input("소재지 (상세 주소 포함)")
-    area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
     
+    # 면적 자동 변환
+    area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
     final_area = ""
     if area_raw:
         if "평" in area_raw:
