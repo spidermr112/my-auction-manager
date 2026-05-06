@@ -62,4 +62,53 @@ if check_password():
                 "사건번호": case_no,
                 "물건종류": p_type,
                 "주소": address,
-                "구분": trade_type
+                "구분": trade_type,
+                "거래가액": price,
+                "방개수": rooms,
+                "면적": area,
+                "비고": memo
+            }
+            
+            df_new = pd.DataFrame([new_data])
+            
+            if not os.path.exists(EXCEL_FILE):
+                df_new.to_excel(EXCEL_FILE, index=False)
+            else:
+                with pd.ExcelWriter(EXCEL_FILE, mode='a', engine='openpyxl', if_sheet_exists='overlay') as writer:
+                    try:
+                        existing_df = pd.read_excel(EXCEL_FILE)
+                        updated_df = pd.concat([existing_df, df_new], ignore_index=True)
+                        updated_df.to_excel(writer, index=False)
+                    except:
+                        df_new.to_excel(writer, index=False)
+            
+            st.success(f"✅ {case_no} 물건 정보가 성공적으로 저장되었습니다!")
+            st.rerun()
+
+    # --- 분석 및 검색 섹션 (데이터가 있을 때만 표시) ---
+    if os.path.exists(EXCEL_FILE):
+        df = pd.read_excel(EXCEL_FILE)
+        
+        st.markdown("---")
+        st.subheader("🔍 스마트 매물 분석기")
+        
+        # 통합 검색
+        search_query = st.text_input("검색어 입력 (어느 항목이든 입력 가능)")
+        if search_query:
+            mask = df.astype(str).apply(lambda x: x.str.contains(search_query, case=False)).any(axis=1)
+            df = df[mask]
+
+        # 유연한 피벗 분석 (항목 자동 인식)
+        col_sort, col_view = st.columns([1, 2])
+        with col_sort:
+            target_column = st.selectbox("📊 분석 기준 선택 (피벗)", df.columns)
+        with col_view:
+            summary = df[target_column].value_counts().reset_index()
+            summary.columns = [target_column, '매물 수']
+            st.dataframe(summary, use_container_width=True)
+
+        # 전체 목록 표시
+        st.subheader("📊 매물 목록")
+        st.dataframe(df, use_container_width=True)
+    else:
+        st
