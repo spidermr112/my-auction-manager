@@ -5,60 +5,58 @@ import os
 import re
 import time
 
-# --- 1. 페이지 설정 및 레이아웃 강제 박제 (핵심 수정) ---
+# --- 1. 페이지 설정 및 레이아웃 강제 고정 (이 부분이 핵심입니다) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 전체 화면의 여백을 조절하여 너무 퍼지지 않게 함 */
+    /* 1. 전체 컨테이너 너비 제한 및 중앙 정렬 (화면이 너무 넓어지는 것 방지) */
     .block-container {
+        max-width: 1600px !important;
         padding-top: 2rem !important;
         padding-bottom: 2rem !important;
-        max-width: 1800px !important; /* 너무 넓은 모니터에서도 퍼짐 방지 */
+        padding-left: 3rem !important;
+        padding-right: 3rem !important;
+        margin: 0 auto !important;
     }
 
-    /* 2. 좌우 배치를 강제 고정하고 줄바꿈 방지 */
+    /* 2. 좌측(등록)과 우측(목록)의 가로 배치 강제 박제 (아래로 안 떨어짐) */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: flex-start !important;
+        gap: 2.5rem !important;
     }
-    
-    /* 3. 좌측 등록창: 브라우저가 넓어져도 400px 이상 커지지 않게 고정 */
-    [data-testid="column"]:nth-child(1) {
+
+    /* 3. 좌측 등록 섹션: 400px로 너비 절대 고정 */
+    [data-testid="column"]:nth-of-type(1) {
+        flex: 0 0 400px !important;
         width: 400px !important;
+        min-width: 400px !important;
         max-width: 400px !important;
-        min-width: 350px !important;
-        flex: none !important;
     }
 
-    /* 4. 우측 목록창: 나머지 공간을 모두 사용 */
-    [data-testid="column"]:nth-child(2) {
+    /* 4. 우측 목록 섹션: 나머지 남는 공간을 모두 채움 */
+    [data-testid="column"]:nth-of-type(2) {
         flex: 1 1 auto !important;
-        min-width: 800px !important;
-        margin-left: 20px !important;
+        min-width: 0 !important;
     }
 
-    /* 5. 라디오 버튼 가로 배치 강제 고정 (늘어짐 방지) */
+    /* 5. 라디오 버튼 가로 배치 강제 유지 (줄바꿈 방지) */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 10px !important;
+        gap: 8px !important;
     }
     div[role="radiogroup"] label {
         white-space: nowrap !important;
     }
-
-    /* 6. 입력창 테두리 시인성 강화 */
-    .stTextInput input, .stTextArea textarea, .stDateInput input {
-        border: 1px solid #ddd !important;
-    }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기본 유지) ---
+# --- 2. 데이터 관리 로직 (기능 수정 절대 없음) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
