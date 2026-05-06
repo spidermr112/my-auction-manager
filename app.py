@@ -5,36 +5,60 @@ import os
 import re
 import time
 
-# --- 1. 페이지 설정 및 레이아웃 강제 고정 (핵심 수정 사항) ---
+# --- 1. 페이지 설정 및 레이아웃 강제 박제 (핵심 수정) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
-# CSS를 사용하여 브라우저 폭이 좁아져도 컬럼이 아래로 떨어지는 것을 방지
 st.markdown("""
     <style>
-    /* 브라우저 크기와 상관없이 좌우 배치를 강제 유지 */
+    /* 1. 전체 화면의 여백을 조절하여 너무 퍼지지 않게 함 */
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1800px !important; /* 너무 넓은 모니터에서도 퍼짐 방지 */
+    }
+
+    /* 2. 좌우 배치를 강제 고정하고 줄바꿈 방지 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
+        flex-direction: row !important;
         flex-wrap: nowrap !important;
-        gap: 1rem !important;
+        align-items: flex-start !important;
     }
-    [data-testid="column"] {
-        flex: none !important;
-        width: auto !important;
-    }
-    /* 좌측 입력창 비율 고정 (1) */
+    
+    /* 3. 좌측 등록창: 브라우저가 넓어져도 400px 이상 커지지 않게 고정 */
     [data-testid="column"]:nth-child(1) {
-        width: 30% !important;
-        min-width: 320px !important;
+        width: 400px !important;
+        max-width: 400px !important;
+        min-width: 350px !important;
+        flex: none !important;
     }
-    /* 우측 목록 비율 고정 (2.2) */
+
+    /* 4. 우측 목록창: 나머지 공간을 모두 사용 */
     [data-testid="column"]:nth-child(2) {
-        width: 70% !important;
-        min-width: 600px !important;
+        flex: 1 1 auto !important;
+        min-width: 800px !important;
+        margin-left: 20px !important;
+    }
+
+    /* 5. 라디오 버튼 가로 배치 강제 고정 (늘어짐 방지) */
+    div[role="radiogroup"] {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: wrap !important;
+        gap: 10px !important;
+    }
+    div[role="radiogroup"] label {
+        white-space: nowrap !important;
+    }
+
+    /* 6. 입력창 테두리 시인성 강화 */
+    .stTextInput input, .stTextArea textarea, .stDateInput input {
+        border: 1px solid #ddd !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기존 유지) ---
+# --- 2. 데이터 관리 로직 (기본 유지) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
