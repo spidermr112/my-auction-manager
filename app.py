@@ -8,19 +8,29 @@ st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide"
 
 st.markdown("""
     <style>
+    /* 모든 입력창, 셀렉트박스, 텍스트 영역의 커서를 화살표(default)로 고정 */
     input, div[data-baseweb="select"], textarea, .stNumberInput {
         cursor: default !important;
     }
+    
+    /* 입력창 내부의 실제 텍스트 입력 영역도 화살표로 변경 */
     input::placeholder, textarea::placeholder {
         cursor: default !important;
     }
+
+    /* 사이드바 내부의 입력 필드들에 대해서도 강제 적용 */
     [data-testid="stSidebar"] * {
         cursor: default !important;
+    }
+    
+    /* 라디오 버튼 간격 조절 (선택사항: 너무 다닥다닥 붙지 않게) */
+    div[data-testid="stWidgetLabel"] {
+        margin-bottom: -10px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 연결 및 테이블 생성 (request_goal 컬럼 추가)
+# 2. 데이터베이스 연결 및 테이블 생성
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
@@ -48,7 +58,7 @@ conn = init_db()
 
 # 3. 사이드바: 매물 등록 기능
 with st.sidebar:
-    st.subheader("📋 신규 등록")
+    st.subheader("🏠 매물 등록")
     
     receipt_date = st.date_input("접수일", value=datetime.now())
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
@@ -64,20 +74,19 @@ with st.sidebar:
 
     with st.form("remaining_form", clear_on_submit=True):
         
-        # [핵심 수정] 주거용일 때만 나타나는 전용 옵션
+        # [핵심 수정] 주거용일 때 모든 선택 옵션을 라디오 버튼 디자인으로 통일
         if main_category == "주거용":
-            # 1. 의뢰목적 (새로 추가된 항목)
+            # 1. 의뢰목적
             request_goal = st.radio("의뢰목적", ["매수/임차", "매도/임대"], horizontal=True)
             
-            # 2. 구분 (매매/전세/월세)
+            # 2. 구분
             category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
             
-            # 3. 방 및 화장실 개수
-            col1, col2 = st.columns(2)
-            with col1:
-                room_count = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상"])
-            with col2:
-                bath_count = st.selectbox("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"])
+            # 3. 방 개수 (라디오 버튼으로 변경)
+            room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
+            
+            # 4. 화장실 개수 (라디오 버튼으로 변경하여 통일성 유지)
+            bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
         else:
             request_goal = "해당없음"
             category = "해당없음"
@@ -89,7 +98,7 @@ with st.sidebar:
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
         
-        submit_button = st.form_submit_button("🏠 DB에 저장하기")
+        submit_button = st.form_submit_button("🏠 데이터베이스에 저장")
 
     if submit_button:
         reg_date = datetime.now().strftime("%Y-%m-%d")
@@ -100,7 +109,7 @@ with st.sidebar:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (reg_date, r_date_str, main_category, item_type, request_goal, room_count, bath_count, address, category, price, area, notes))
         conn.commit()
-        st.success(f"등록 완료!")
+        st.success(f"매물이 성공적으로 등록되었습니다!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
@@ -109,7 +118,7 @@ st.header("📝 실시간 데이터 관리")
 
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-search_query = st.text_input("🔍 통합 검색")
+search_query = st.text_input("🔍 통합 검색 (지역, 방수, 목적 등 검색 가능)")
 
 if search_query:
     keywords = search_query.split()
@@ -121,7 +130,9 @@ if search_query:
 else:
     display_df = df
 
-# 데이터 편집기 (의뢰목적 컬럼 추가)
+st.write(f"📊 검색 결과: {len(display_df)} 건")
+
+# 데이터 편집기
 edited_df = st.data_editor(
     display_df,
     column_config={
@@ -130,7 +141,7 @@ edited_df = st.data_editor(
         "receipt_date": st.column_config.TextColumn("접수일"),
         "item_category": st.column_config.TextColumn("대분류"),
         "item_type": st.column_config.TextColumn("물건종류"),
-        "request_goal": st.column_config.TextColumn("의뢰목적"), # 추가
+        "request_goal": st.column_config.TextColumn("의뢰목적"),
         "room_count": st.column_config.TextColumn("방수"),
         "bath_count": st.column_config.TextColumn("화장실수"),
         "address": st.column_config.TextColumn("주소"),
@@ -144,11 +155,12 @@ edited_df = st.data_editor(
     key="main_editor"
 )
 
+# 5. 하단 버튼 영역
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("반영되었습니다!")
+        st.success("데이터가 성공적으로 업데이트되었습니다!")
         st.rerun()
 
 with col2:
