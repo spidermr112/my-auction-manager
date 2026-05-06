@@ -4,44 +4,55 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 완전히 다른 방식(Grid)으로 프레임 고정 ---
+# --- 1. 페이지 설정 및 좌측 500px 고정 레이아웃 (CSS Grid) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 화면 여백 최적화 */
+    /* 전체 화면 여백 및 배경 최적화 */
     .block-container {
         padding: 1.5rem 2rem !important;
         max-width: 100% !important;
     }
 
-    /* 1. 핵심 해결책: 기존 스트림릿의 비율 방식을 버리고 Grid 방식으로 강제 전환 */
+    /* 핵심 해결책: 좌측 프레임을 500px로 절대 고정 */
     [data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: 380px 1fr !important; /* 좌측 380px 절대 고정, 우측 남는 공간 전부(1fr) 차지 */
-        gap: 2rem !important;
+        grid-template-columns: 500px 1fr !important; /* 좌측을 500px로 확장 및 고정 */
+        gap: 2.5rem !important;
         align-items: start !important;
     }
 
-    /* 2. 스트림릿이 강제로 주입하는 가변 비율(%) 무력화 */
+    /* 스트림릿 기본 가변 폭 설정 무력화 */
     [data-testid="column"] {
         width: 100% !important; 
         max-width: 100% !important;
         min-width: 0 !important;
-        flex: none !important; /* 기존 Flexbox 설정 완전히 끄기 */
+        flex: none !important;
     }
 
-    /* 3. 라디오 버튼 등 내부 요소 줄바꿈 및 정렬 고정 */
+    /* 라디오 버튼 항목들이 500px 안에서 여유롭게 배치되도록 설정 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 10px !important;
+        gap: 15px !important;
+        justify-content: flex-start !important;
+    }
+    
+    div[role="radiogroup"] label {
+        margin-right: 10px !important;
+        white-space: nowrap !important;
+    }
+
+    /* 입력 폼 내부 간격 조정 */
+    [data-testid="stForm"] {
+        padding: 20px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (절대 수정 없음) ---
+# --- 2. 데이터 관리 로직 (기능 유지) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -90,7 +101,7 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
 # --- 3. 화면 배치 ---
-col_reg, col_list = st.columns([1, 1]) # Grid가 통제하므로 이 수치는 더 이상 영향을 주지 못함
+col_reg, col_list = st.columns([1, 1]) # CSS Grid가 제어하므로 설정값 무관
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
@@ -154,4 +165,16 @@ with col_list:
     
     df_f = st.session_state.data.copy()
     if s_query:
-        df_
+        df_f = df_f[df_f.apply(lambda r: s_query in str(r.values), axis=1)]
+    if sel_subs:
+        df_f = df_f[df_f['item_sub_category'].isin(sel_subs)]
+    if sel_purps:
+        df_f = df_f[df_f['purpose'].isin(sel_purps)]
+    
+    st.dataframe(df_f.iloc[::-1], use_container_width=True, hide_index=True)
+
+    if st.button("🗑️ 전체 데이터 초기화"):
+        if st.checkbox("정말 삭제하시겠습니까?"):
+            st.session_state.data = create_empty_df()
+            save_data(st.session_state.data)
+            st.rerun()
