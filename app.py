@@ -1,32 +1,172 @@
-# 다중 키워드 교차 검색 엔진 (숫자 비교 기능 추가 버전)
-if search_query:
-    keywords = search_query.split()
-    filtered_df = df.copy()
+import streamlit as st
+import sqlite3
+import pandas as pd
+import re
+from datetime import datetime
+
+# 1. 페이지 설정
+st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
+
+# --- UI 스타일 정의 ---
+st.markdown("""
+    <style>
+    .main-title {
+        font-size: 40px !important;
+        color: #2E5077;
+        font-weight: bold;
+        text-align: center;
+        margin-top: 10px;
+    }
+    .sub-title {
+        text-align: center;
+        color: #666;
+        margin-bottom: 30px;
+    }
+    /* 구글 스타일 검색바 */
+    .stTextInput input {
+        border-radius: 24px !important;
+        padding-left: 20px !important;
+        height: 48px !important;
+        border: 1px solid #dfe1e5 !important;
+    }
+    .stTextInput input:focus {
+        box-shadow: 0 1px 6px rgba(32,33,36,0.28) !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. 데이터베이스 초기화
+def init_db():
+    conn = sqlite3.connect('park_real_estate.db', check_same_thread=False)
+    cur = conn.cursor()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS auctions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reg_date TEXT, receipt_date TEXT, item_category TEXT, item_type TEXT,
+            request_goal TEXT, room_count TEXT, bath_count TEXT, address TEXT,
+            category TEXT, price INTEGER, deposit INTEGER, monthly_rent INTEGER, 
+            converted_deposit INTEGER, area TEXT, notes TEXT
+        )
+    ''')
+    conn.commit()
+    return conn
+
+conn = init_db()
+
+# 3. 사이드바: 매물 등록 (라디오 버튼 스타일)
+with st.sidebar:
+    st.subheader("📍 매물 등록")
+    receipt_date = st.date_input("접수일", value=datetime.now())
+    main_category = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
     
-    for kw in keywords:
-        # 1. '이상/이하' 패턴 분석 (예: 12평이상, 5000만이하)
-        match = re.match(r"(\d+)(.*?)(이상|이하|초과|미만)", kw)
-        
-        if match:
-            val = float(match.group(1)) # 숫자 (12)
-            unit = match.group(2)      # 단위 (평)
-            op = match.group(3)        # 조건 (이상)
+    sub_map = {
+        "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
+        "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
+        "토지": ["토지"]
+    }
+    item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
+    request_goal = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
+
+    is_lease = request_goal in ["임대", "임차"]
+    is_sale = request_goal in ["매도", "매수", "교환"]
+
+    if main_category == "주거용":
+        category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
+        room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
+        bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
+    else: category, room_count, bath_count = "", "", ""
+
+    deposit, monthly_rent, price = 0, 0, 0
+    if is_lease:
+        c1, c2 = st.columns(2)
+        with c1: deposit = st.number_input("보증금(만원)", min_value=0, value=None)
+        with c2: monthly_rent = st.number_input("차임(만원)", min_value=0, value=None)
+    if is_sale:
+        price = st.number_input("거래가액(만원)", min_value=0, value=None)
+
+    address = st.text_input("소재지 상세")
+    area_raw = st.text_input("면적 (평 또는 ㎡ 입력)")
+    final_area = ""
+    if area_raw:
+        if "평" in area_raw:
+            num = float(re.findall(r"\d+\.?\d*", area_raw)[0])
+            final_area = f"{round(num * 3.3058, 2)}㎡ ({num}평)"
+        else: final_area = f"{area_raw}㎡"
             
-            # 면적 컬럼에서 숫자만 추출하여 비교 (평수 기준)
-            if '평' in unit or '면적' in kw:
-                # 면적 데이터에서 '12.0평' -> 12.0 숫자만 추출
-                filtered_df['temp_num'] = filtered_df['area'].str.extract(r'\((\d+\.?\d*)평\)').astype(float)
-                if op == "이상": filtered_df = filtered_df[filtered_df['temp_num'] >= val]
-                elif op == "이하": filtered_df = filtered_df[filtered_df['temp_num'] <= val]
-            
-            # 가격(가액) 컬럼 비교 (단위가 없거나 '만'일 때)
-            elif '만' in unit or '가액' in kw or '가격' in kw:
-                if op == "이상": filtered_df = filtered_df[filtered_df['price'] >= val]
-                elif op == "이하": filtered_df = filtered_df[filtered_df['price'] <= val]
-        
-        else:
-            # 2. 일반 키워드 검색 (기존 로직)
-            mask = filtered_df.astype(str).apply(lambda x: x.str.contains(kw, case=False, na=False)).any(axis=1)
-            filtered_df = filtered_df[mask]
+    notes = st.text_area("특약 및 분석내용")
     
-    display_df = filtered_df
+    if st.button("🏠 데이터베이스 저장"):
+        reg_date_str = datetime.now().strftime("%Y-%m-%d")
+        r_date_str = receipt_date.strftime("%Y-%m-%d")
+        conv_dep = (deposit if deposit else 0) + ((monthly_rent if monthly_rent else 0) * 100)
+        cur = conn.cursor()
+        cur.execute('INSERT INTO auctions (reg_date, receipt_date, item_category, item_type, request_goal, room_count, bath_count, address, category, price, deposit, monthly_rent, converted_deposit, area, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', 
+                    (reg_date_str, r_date_str, main_category, item_type, request_goal, room_count, bath_count, address, category, price, deposit, monthly_rent, conv_dep, final_area, notes))
+        conn.commit()
+        st.success("매물이 등록되었습니다!")
+        st.rerun()
+
+# 4. 메인 화면: 구글 스타일 지능형 검색
+st.markdown('<p class="main-title">🏘️ 파크부동산</p>', unsafe_allow_html=True)
+st.markdown('<p class="sub-title">키워드 검색 및 숫자 조건 검색 가능 (예: 가곡리 12평이상 5000만이하)</p>', unsafe_allow_html=True)
+
+search_query = st.text_input("", placeholder="🔍 무엇을 찾으실까요? (예: 아파트 매매 20평이상)", key="main_search")
+
+# 전체 데이터 로드
+df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
+
+if not df.empty:
+    if search_query:
+        keywords = search_query.split()
+        filtered_df = df.copy()
+        
+        for kw in keywords:
+            # [지능형 필터] 숫자+조건 인식 (예: 12평이상, 5000이하)
+            match = re.match(r"(\d+\.?\d*)(.*?)(이상|이하|초과|미만)", kw)
+            
+            if match:
+                val = float(match.group(1))
+                unit = match.group(2)
+                op = match.group(3)
+                
+                try:
+                    # 1. 면적 비교 (평수 기준)
+                    if '평' in unit or '면적' in kw:
+                        # '12.0㎡ (10평)' 형태에서 평수 숫자만 추출
+                        filtered_df['temp_num'] = filtered_df['area'].str.extract(r'\((\d+\.?\d*)평\)').astype(float)
+                    # 2. 가격 비교 (가액/가고/가격 등)
+                    elif any(x in unit or x in kw for x in ['만', '가격', '가액', '금액']):
+                        filtered_df['temp_num'] = filtered_df['price'].astype(float)
+                    else:
+                        # 일반 텍스트 검색으로 전환
+                        raise ValueError
+                    
+                    if op == "이상": filtered_df = filtered_df[filtered_df['temp_num'] >= val]
+                    elif op == "이하": filtered_df = filtered_df[filtered_df['temp_num'] <= val]
+                    elif op == "초과": filtered_df = filtered_df[filtered_df['temp_num'] > val]
+                    elif op == "미만": filtered_df = filtered_df[filtered_df['temp_num'] < val]
+                except:
+                    # 조건 분석 실패 시 일반 텍스트 검색 진행
+                    mask = filtered_df.astype(str).apply(lambda x: x.str.contains(kw, case=False, na=False)).any(axis=1)
+                    filtered_df = filtered_df[mask]
+            else:
+                # [일반 필터] 모든 컬럼 통합 검색 (셀 경계 무시)
+                mask = filtered_df.astype(str).apply(lambda x: x.str.contains(kw, case=False, na=False)).any(axis=1)
+                filtered_df = filtered_df[mask]
+        
+        display_df = filtered_df
+    else:
+        display_df = df
+
+    # 결과 표 출력
+    st.write(f"검색 결과: **{len(display_df)}** 건")
+    st.data_editor(
+        display_df.drop(columns=['temp_num']) if 'temp_num' in display_df.columns else display_df,
+        column_config={
+            "id": None, "price": "가액(만)", "deposit": "보증금", "monthly_rent": "차임", 
+            "converted_deposit": "환산보증금", "area": "면적", "notes": "특약/분석"
+        },
+        use_container_width=True, key="data_view"
+    )
+else:
+    st.info("데이터가 없습니다. 매물을 먼저 등록해주세요.")
