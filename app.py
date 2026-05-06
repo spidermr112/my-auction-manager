@@ -8,14 +8,13 @@ import time
 # --- 1. 페이지 설정 및 디자인 고정 ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
-# 사이드바 폭 고정 및 [줄바꿈 방지] CSS 추가
+# 사이드바 폭 고정 및 줄바꿈 방지 CSS
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
         min-width: 350px;
         max-width: 350px;
     }
-    /* 체크박스 옆 글자가 절대 줄바꿈되지 않도록 강제 설정 */
     .stCheckbox label {
         white-space: nowrap !important;
         word-break: keep-all !important;
@@ -27,7 +26,6 @@ st.markdown("""
         font-size: 15px;
         white-space: nowrap;
     }
-    /* 컬럼 간격 미세 조정 */
     [data-testid="column"] {
         padding-right: 5px !important;
         padding-left: 5px !important;
@@ -147,31 +145,32 @@ s_query = st.text_input("🔍 키워드 검색 (주소, 특약 등)", placeholde
 
 # [필터 상세 선택 섹션]
 with st.expander("✅ 필터 상세 선택", expanded=True):
-    # 1. 주거용 라인
+    # 1. 주거용 라인 (연동 기능 추가)
     c = st.columns([1, 1.2, 1.2, 1, 1, 1.5])
     f_ju = c[0].checkbox("주거용", key="f_ju")
-    f_yeon = c[1].checkbox("연립/다세대", key="f_yeon")
-    f_dan = c[2].checkbox("단독/다가구", key="f_dan")
-    f_jeon = c[3].checkbox("전원주택", key="f_jeon")
-    f_apt = c[4].checkbox("아파트", key="f_apt")
-    f_op = c[5].checkbox("오피스텔(주거)", key="f_op")
+    # 대분류 체크 시 소분류의 value값을 f_ju와 동기화
+    f_yeon = c[1].checkbox("연립/다세대", key="f_yeon", value=f_ju if f_ju else False)
+    f_dan = c[2].checkbox("단독/다가구", key="f_dan", value=f_ju if f_ju else False)
+    f_jeon = c[3].checkbox("전원주택", key="f_jeon", value=f_ju if f_ju else False)
+    f_apt = c[4].checkbox("아파트", key="f_apt", value=f_ju if f_ju else False)
+    f_op = c[5].checkbox("오피스텔(주거)", key="f_op", value=f_ju if f_ju else False)
 
-    # 2. 비주거용 라인
+    # 2. 비주거용 라인 (연동 기능 추가)
     b = st.columns([1, 1.2, 1, 1, 1.2, 1.5])
     f_bi = b[0].checkbox("비주거용", key="f_bi")
-    f_sang = b[1].checkbox("상가/사무실", key="f_sang")
-    f_gong = b[2].checkbox("공장/창고", key="f_gong")
-    f_build = b[3].checkbox("빌딩/건물", key="f_build")
-    f_jisik = b[4].checkbox("지식산업센터", key="f_jisik")
-    f_etc_non = b[5].checkbox("기타", key="f_etc_non")
+    f_sang = b[1].checkbox("상가/사무실", key="f_sang", value=f_bi if f_bi else False)
+    f_gong = b[2].checkbox("공장/창고", key="f_gong", value=f_bi if f_bi else False)
+    f_build = b[3].checkbox("빌딩/건물", key="f_build", value=f_bi if f_bi else False)
+    f_jisik = b[4].checkbox("지식산업센터", key="f_jisik", value=f_bi if f_bi else False)
+    f_etc_non = b[5].checkbox("기타", key="f_etc_non", value=f_bi if f_bi else False)
 
-    # 3. 토지 라인
+    # 3. 토지 라인 (연동 기능 추가)
     l = st.columns([1, 1, 1, 1, 1, 1.5])
     f_to = l[0].checkbox("토지", key="f_to")
-    f_dae = l[1].checkbox("대지", key="f_dae")
-    f_imya = l[2].checkbox("임야", key="f_imya")
-    f_nong = l[3].checkbox("농지", key="f_nong")
-    f_etc_land = l[4].checkbox("기타 ", key="f_etc_land")
+    f_dae = l[1].checkbox("대지", key="f_dae", value=f_to if f_to else False)
+    f_imya = l[2].checkbox("임야", key="f_imya", value=f_to if f_to else False)
+    f_nong = l[3].checkbox("농지", key="f_nong", value=f_to if f_to else False)
+    f_etc_land = l[4].checkbox("기타 ", key="f_etc_land", value=f_to if f_to else False)
 
     st.markdown("---")
 
@@ -192,28 +191,21 @@ with st.expander("✅ 필터 상세 선택", expanded=True):
 df_display = st.session_state.data.copy()
 selected_subs = []
 
-if f_ju: selected_subs.extend(["연립/다세대", "단독/다가구", "전원주택", "아파트", "오피스텔(주거)"])
-else:
-    if f_yeon: selected_subs.append("연립/다세대")
-    if f_dan: selected_subs.append("단독/다가구")
-    if f_jeon: selected_subs.append("전원주택")
-    if f_apt: selected_subs.append("아파트")
-    if f_op: selected_subs.append("오피스텔(주거)")
-
-if f_bi: selected_subs.extend(["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"])
-else:
-    if f_sang: selected_subs.append("상가/사무실")
-    if f_gong: selected_subs.append("공장/창고")
-    if f_build: selected_subs.append("빌딩/건물")
-    if f_jisik: selected_subs.append("지식산업센터")
-    if f_etc_non: selected_subs.append("기타")
-
-if f_to: selected_subs.extend(["대지", "임야", "농지", "기타 "])
-else:
-    if f_dae: selected_subs.append("대지")
-    if f_imya: selected_subs.append("임야")
-    if f_nong: selected_subs.append("농지")
-    if f_etc_land: selected_subs.append("기타 ")
+# 소분류 체크박스 값들을 수집 (대분류와 연동됨)
+if f_yeon: selected_subs.append("연립/다세대")
+if f_dan: selected_subs.append("단독/다가구")
+if f_jeon: selected_subs.append("전원주택")
+if f_apt: selected_subs.append("아파트")
+if f_op: selected_subs.append("오피스텔(주거)")
+if f_sang: selected_subs.append("상가/사무실")
+if f_gong: selected_subs.append("공장/창고")
+if f_build: selected_subs.append("빌딩/건물")
+if f_jisik: selected_subs.append("지식산업센터")
+if f_etc_non: selected_subs.append("기타")
+if f_dae: selected_subs.append("대지")
+if f_imya: selected_subs.append("임야")
+if f_nong: selected_subs.append("농지")
+if f_etc_land: selected_subs.append("기타 ")
 
 if selected_subs:
     selected_subs = list(set(selected_subs))
