@@ -1,137 +1,123 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import os
-import time
 
 # --- 페이지 설정 ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
-# --- 데이터 영구 저장 로직 ---
-DB_FILE = "property_data.csv"
-
-def load_data():
-    if os.path.exists(DB_FILE):
-        try:
-            df = pd.read_csv(DB_FILE)
-            if 'receipt_date' in df.columns:
-                df['receipt_date'] = pd.to_datetime(df['receipt_date']).dt.date
-            if 'id' in df.columns:
-                df['id'] = df['id'].astype(str)
-            # 필수 컬럼 보완
-            for col in ["id", "receipt_date", "item_category", "item_sub_category", "purpose", "trade_type", "price", "address", "area", "description", "status"]:
-                if col not in df.columns:
-                    df[col] = "진행중" if col == "status" else "N/A"
-            return df
-        except:
-            return create_empty_df()
-    else:
-        return create_empty_df()
-
-def create_empty_df():
-    return pd.DataFrame(columns=["id", "receipt_date", "item_category", "item_sub_category", "purpose", "trade_type", "price", "address", "area", "description", "status"])
-
-def save_data(df):
-    df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
-
-# 세션 데이터 초기화
+# --- 데이터 로드 (세션 상태 활용) ---
 if 'data' not in st.session_state:
-    st.session_state.data = load_data()
+    st.session_state.data = pd.DataFrame(columns=[
+        "receipt_date", "item_category", "item_sub_category", 
+        "purpose", "trade_type", "room_count", "bathroom_count", 
+        "price", "address", "area", "description"
+    ])
 
-# --- 레이아웃 구성 (좌: 입력 / 우: 목록) ---
-col_reg, col_list = st.columns([1, 2.8])
+# --- 레이아웃 구성 ---
+col_reg, col_list = st.columns([1, 2])
 
-# --- [좌측] 매물 등록 (빠른 입력을 위해 깔끔하게 정리) ---
+# --- [수정] 왼쪽: 매물 등록 파트 ---
 with col_reg:
-    st.subheader("📍 신규 매물 등록")
-    with st.container(border=True):
-        reg_date = st.date_input("접수일", datetime.now(), key="k_date")
-        reg_cat = st.radio("대분류", ["주거용", "비주거용", "토지"], horizontal=True, key="k_cat")
-        
-        if reg_cat == "주거용":
-            subs = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
-        elif reg_cat == "비주거용":
-            subs = ["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"]
+    st.subheader("📍 매물 등록")
+    
+    # 폼(form)을 사용하지 않아야 대분류 클릭 시 소분류가 즉시 바뀝니다.
+    receipt_date = st.date_input("접수일", datetime.now())
+    
+    # 1. 대분류 선택 (실시간 반영의 핵심)
+    item_category = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
+    
+    # 2. 대분류에 따른 소분류 옵션 동적 할당
+    if item_category == "주거용":
+        sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
+    elif item_category == "비주거용":
+        sub_options = ["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"]
+    else:  # 토지
+        sub_options = ["대지", "임야", "농지", "기타"]
+    
+    # 소분류 라디오 버튼 (위에 설정한 sub_options가 즉시 적용됨)
+    item_sub_category = st.radio("물건 소분류", sub_options, horizontal=True)
+    
+    purpose = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
+    trade_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
+    
+    # 주거용일 때만 추가 정보 입력
+    if item_category == "주거용":
+        r_col, b_col = st.columns(2)
+        with r_col:
+            room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
+        with b_col:
+            bathroom_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
+    else:
+        room_count = "N/A"
+        bathroom_count = "N/A"
+    
+    price = st.number_input("거래가액(만원)", min_value=0, step=100)
+    address = st.text_input("소재지 상세")
+    area = st.text_input("면적")
+    description = st.text_area("특약내용")
+    
+    # 저장 버튼
+    if st.button("🏠 데이터베이스 저장"):
+        if address:  # 최소한의 필수값 확인
+            new_row = pd.DataFrame([{
+                "receipt_date": receipt_date, 
+                "item_category": item_category,
+                "item_sub_category": item_sub_category, 
+                "purpose": purpose,
+                "trade_type": trade_type, 
+                "room_count": room_count,
+                "bathroom_count": bathroom_count, 
+                "price": price,
+                "address": address, 
+                "area": area, 
+                "description": description
+            }])
+            st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+            st.success(f"{item_sub_category} 등록 완료!")
+            st.rerun()
         else:
-            subs = ["대지", "임야", "농지", "기타"]
-        
-        reg_sub = st.selectbox("소분류", subs, key="k_sub")
-        reg_trade = st.radio("거래구분", ["매매", "전세", "월세"], horizontal=True, key="k_trade")
-        reg_price = st.number_input("거래금액(만원)", min_value=0, step=1000, key="k_price")
-        reg_addr = st.text_input("상세주소", key="k_addr")
-        reg_area = st.text_input("면적(평/㎡)", key="k_area")
-        reg_desc = st.text_area("특약사항", key="k_desc")
-        
-        if st.button("💾 매물 저장", use_container_width=True, key="k_save_btn"):
-            if reg_addr:
-                new_id = f"P{int(time.time())}"
-                new_row = pd.DataFrame([{
-                    "id": new_id, "receipt_date": reg_date, "item_category": reg_cat,
-                    "item_sub_category": reg_sub, "purpose": "매도", # 기본값
-                    "trade_type": reg_trade, "price": reg_price, "address": reg_addr, 
-                    "area": reg_area, "description": reg_desc, "status": "진행중"
-                }])
-                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
-                save_data(st.session_state.data)
-                st.success("저장 완료!")
-                st.rerun()
+            st.error("소재지 상세 주소를 입력해주세요.")
 
-# --- [우측] 매물 목록 (전문가용 표 형식) ---
+# --- 오른쪽: 매물 목록 및 색인 파트 (기능 유지) ---
 with col_list:
-    st.title("🏘️ 파크부동산 통합 관리 대장")
+    st.title("🏘️ 파크부동산")
     
-    # 1. 통합 검색 및 필터 (체크박스 대신 멀티셀렉트로 깔끔하게)
-    with st.container(border=True):
-        f1, f2 = st.columns([2, 1])
-        with f1:
-            search_q = st.text_input("🔍 주소/특약 키워드 검색", placeholder="검색어를 입력하세요.", key="k_search")
-        with f2:
-            all_list = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택", "상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "대지", "임야", "농지"]
-            sel_sub = st.multiselect("소분류 필터", all_list, key="k_filter_sub")
+    search_query = st.text_input("🔍 키워드 검색", placeholder="소재지나 특약 내용을 입력하세요.")
 
+    st.write("---")
+    st.markdown("### ✅ 필터 선택 (복수 선택 가능)")
+
+    # 체크박스 필터 생성 함수
+    def create_checkbox_filter(label, options):
+        st.markdown(f"**{label}**")
+        cols = st.columns(len(options))
+        selected = []
+        for i, option in enumerate(options):
+            if cols[i].checkbox(option, key=f"filter_{label}_{option}"):
+                selected.append(option)
+        return selected
+
+    # 색인용 소분류 통합 리스트
+    all_sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택", 
+                       "상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "대지", "임야", "농지"]
+    
+    filter_sub_cat = create_checkbox_filter("물건 소분류", all_sub_options)
+    filter_purpose = create_checkbox_filter("의뢰목적", ["매도", "임대", "매수", "임차", "교환"])
+    filter_trade = create_checkbox_filter("거래구분", ["매매", "전세", "월세"])
+    
     # 데이터 필터링 로직
-    df = st.session_state.data.copy()
-    if search_q:
-        df = df[df.apply(lambda r: search_q in str(r.values), axis=1)]
-    if sel_sub:
-        df = df[df['item_sub_category'].isin(sel_sub)]
+    filtered_df = st.session_state.data.copy()
 
-    # 2. 탭 시스템 (진행중 / 완료)
-    tab_active, tab_done = st.tabs(["📊 진행중 매물 관리", "📂 거래완료 히스토리"])
+    if search_query:
+        filtered_df = filtered_df[filtered_df.apply(lambda r: search_query in str(r.values), axis=1)]
     
-    with tab_active:
-        active_list = df[df['status'] == "진행중"]
-        if active_list.empty:
-            st.info("현재 진행 중인 매물이 없습니다.")
-        else:
-            # 엑셀처럼 깔끔한 표로 출력
-            st.dataframe(
-                active_list[["receipt_date", "item_sub_category", "trade_type", "price", "address", "area", "description", "id"]],
-                column_config={
-                    "receipt_date": "접수일", "item_sub_category": "분류", "trade_type": "구분",
-                    "price": st.column_config.NumberColumn("금액(만원)", format="%d"),
-                    "address": "주소", "area": "면적", "description": "특약", "id": "관리번호"
-                },
-                hide_index=True, use_container_width=True
-            )
-            
-            # 거래 완료 처리 섹션 (줄줄이 나오지 않게 하나로 묶음)
-            with st.expander("✅ 선택한 매물 거래 완료 처리"):
-                finish_id = st.selectbox("완료 처리할 매물 주소 선택", 
-                                       options=active_list['id'].tolist(),
-                                       format_func=lambda x: active_list[active_list['id'] == x]['address'].values[0],
-                                       key="k_finish_select")
-                if st.button("해당 매물 완료 처리", use_container_width=True):
-                    st.session_state.data.loc[st.session_state.data['id'] == finish_id, 'status'] = "거래완료"
-                    save_data(st.session_state.data)
-                    st.success("거래 완료 처리되었습니다!")
-                    st.rerun()
+    if filter_sub_cat:
+        filtered_df = filtered_df[filtered_df['item_sub_category'].isin(filter_sub_cat)]
+    if filter_purpose:
+        filtered_df = filtered_df[filtered_df['purpose'].isin(filter_purpose)]
+    if filter_trade:
+        filtered_df = filtered_df[filtered_df['trade_type'].isin(filter_trade)]
 
-    with tab_done:
-        done_list = df[df['status'] == "거래완료"]
-        st.dataframe(done_list, use_container_width=True, hide_index=True)
-        if not done_list.empty:
-            if st.button("🚩 완료 목록 전체 삭제", key="k_del_all"):
-                st.session_state.data = st.session_state.data[st.session_state.data['status'] == "진행중"]
-                save_data(st.session_state.data)
-                st.rerun()
+    # 최종 결과 출력
+    st.write(f"**검색 결과:** {len(filtered_df)} 건")
+    st.dataframe(filtered_df, use_container_width=True)
