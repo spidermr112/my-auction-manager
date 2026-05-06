@@ -53,23 +53,23 @@ conn = init_db()
 with st.sidebar:
     st.subheader("📋 신규 등록")
     
-    # 💡 즉각적인 소분류 업데이트를 위해 선택창을 Form 바깥에 배치합니다.
+    # 접수일 선택
     receipt_date = st.date_input("접수일", value=datetime.now())
     
-    # 대분류 선택 (선택 즉시 앱이 Rerun되어 아래 소분류 목록을 갱신함)
-    main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
+    # [수정] 대분류: 기타 -> 토지 변경
+    main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
-    # 대분류 값에 따른 소분류 목록 동적 설정
+    # 대분류에 따른 소분류 리스트 자동 전환
     if main_category == "주거용":
         sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
     elif main_category == "비주거용":
         sub_options = ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"]
-    else:
-        sub_options = ["토지/대지", "임야/전답", "잡종지", "창고용지", "기타"]
+    else: # '토지' 선택 시
+        sub_options = ["대지", "전/답/과수원", "임야", "잡종지", "창고용지/공장용지", "기타 토지"]
         
     item_type = st.selectbox("물건 소분류", sub_options)
 
-    # 나머지 항목들은 Form으로 묶어 한 번에 저장 처리
+    # 상세 정보 입력 Form
     with st.form("remaining_form", clear_on_submit=True):
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
         address_detail = st.text_input("상세 주소")
@@ -93,18 +93,18 @@ with st.sidebar:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (reg_date, r_date_str, main_category, item_type, full_address, category, price, rooms, area, notes))
         conn.commit()
-        st.success(f"데이터가 저장되었습니다!")
+        st.success(f"[{main_category}] 저장 완료!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
-# 전체 데이터 불러오기
+# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 통합 검색 기능 (띄어쓰기 AND 검색 지원)
-search_query = st.text_input("🔍 통합 검색 (예: '비주거용 남양주' 입력 시 두 단어 모두 포함된 행 검색)")
+# 통합 검색 기능 (AND 검색 지원)
+search_query = st.text_input("🔍 통합 검색 (예: '토지 남양주' 입력 시 두 단어 모두 포함된 행 검색)")
 
 if search_query:
     keywords = search_query.split()
@@ -118,15 +118,21 @@ else:
 
 st.write(f"📊 검색 결과: {len(display_df)} 건")
 
-# 데이터 편집기
+# 데이터 편집기 (표 제목 한글화 적용)
 edited_df = st.data_editor(
     display_df,
     column_config={
-        "id": None, # ID 숨김
+        "id": None,
+        "reg_date": st.column_config.TextColumn("등록일"),
         "receipt_date": st.column_config.TextColumn("접수일"),
         "item_category": st.column_config.TextColumn("대분류"),
         "item_type": st.column_config.TextColumn("물건종류"),
-        "reg_date": st.column_config.TextColumn("등록일")
+        "address": st.column_config.TextColumn("주소"),
+        "category": st.column_config.TextColumn("구분"),
+        "price": st.column_config.NumberColumn("가액(만원)"),
+        "rooms": st.column_config.TextColumn("방수"),
+        "area": st.column_config.TextColumn("면적"),
+        "notes": st.column_config.TextColumn("비고")
     },
     num_rows="dynamic",
     use_container_width=True,
@@ -137,9 +143,8 @@ edited_df = st.data_editor(
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
-        # 편집된 내용을 DB에 덮어쓰기
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("반영되었습니다!")
+        st.success("데이터베이스가 업데이트되었습니다!")
         st.rerun()
 
 with col2:
