@@ -25,7 +25,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 연결 및 테이블 생성 (방/화장실 컬럼 세분화)
+# 2. 데이터베이스 연결 및 테이블 생성
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
@@ -54,7 +54,7 @@ conn = init_db()
 with st.sidebar:
     st.subheader("📋 신규 등록")
     
-    # 즉각적인 화면 변화를 위해 일부 항목을 Form 바깥에 배치
+    # 상단 고정 항목 (즉시 반응을 위해 Form 외부 배치)
     receipt_date = st.date_input("접수일", value=datetime.now())
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
@@ -71,21 +71,25 @@ with st.sidebar:
     # 상세 정보 입력 Form 시작
     with st.form("remaining_form", clear_on_submit=True):
         
-        # [핵심 수정] 주거용일 때만 방/화장실 개수 선택창 표시
+        # [핵심 수정] 주거용일 때만 나타나는 전용 옵션 그룹
         if main_category == "주거용":
+            # 1. 매매/전세/월세 구분 (방 개수 위로 배치)
+            category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
+            
+            # 2. 방 및 화장실 개수 (가로 배치)
             col1, col2 = st.columns(2)
             with col1:
                 room_count = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상"])
             with col2:
                 bath_count = st.selectbox("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"])
         else:
-            # 주거용이 아니면 데이터베이스에는 'N/A'로 저장
+            # 주거용이 아닐 경우 기본값 설정
+            category = "해당없음"
             room_count = "N/A"
             bath_count = "N/A"
 
-        # 주소 및 상세 정보
+        # 공통 입력 항목
         address = st.text_input("소재지 (상세 주소 포함)")
-        category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
@@ -101,18 +105,16 @@ with st.sidebar:
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (reg_date, r_date_str, main_category, item_type, room_count, bath_count, address, category, price, area, notes))
         conn.commit()
-        st.success(f"매물이 등록되었습니다!")
+        st.success(f"[{main_category}] 등록 완료!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
-# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 통합 검색 기능
-search_query = st.text_input("🔍 통합 검색 (예: '방3 남양주' 입력 시 두 조건 동시 검색)")
+search_query = st.text_input("🔍 통합 검색 (예: '방3 매매' 입력 시 동시 검색 가능)")
 
 if search_query:
     keywords = search_query.split()
@@ -126,7 +128,7 @@ else:
 
 st.write(f"📊 검색 결과: {len(display_df)} 건")
 
-# 데이터 편집기 (한글 컬럼 설정 및 방/화장실 추가)
+# 데이터 편집기
 edited_df = st.data_editor(
     display_df,
     column_config={
@@ -153,7 +155,7 @@ col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("데이터베이스가 동기화되었습니다!")
+        st.success("데이터베이스에 반영되었습니다!")
         st.rerun()
 
 with col2:
