@@ -110,21 +110,24 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
-    # --- [수정 포인트] 면적 자동 변환 로직 ---
-    area_input = st.text_input("공급/전용 면적 (예: 30평)", placeholder="숫자만 쓰거나 '30평'이라 입력")
+    # --- [핵심 수정] 면적 자동 입력 및 변환 로직 ---
+    area_raw = st.text_input("면적 입력 (예: 30평)", placeholder="숫자만 쓰거나 '30평' 입력 후 엔터")
     
-    final_area = area_input
-    if "평" in area_input:
-        try:
-            # 숫자 부분만 추출 (정수 또는 실수)
-            num_part = re.findall(r"[-+]?\d*\.\d+|\d+", area_input)
-            if num_part:
-                pyung_val = float(num_part[0])
-                m2_val = round(pyung_val * 3.3058, 2)
-                final_area = f"{m2_val}㎡ ({pyung_val}평)"
-                st.caption(f"✨ 변환 결과: {final_area}")
-        except:
-            pass
+    calculated_val = ""
+    if area_raw:
+        if "평" in area_raw:
+            try:
+                num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
+                m2_val = round(num_part * 3.3058, 2)
+                calculated_val = f"{m2_val}㎡ ({num_part}평)"
+            except:
+                calculated_val = area_raw
+        else:
+            calculated_val = area_raw
+
+    # 계산된 값이 있으면 자동으로 채워지고, 없으면 빈칸
+    final_area = st.text_input("최종 저장 면적 (자동 생성됨)", value=calculated_val)
+    # ----------------------------------------------
             
     notes = st.text_area("특약사항 및 분석내용")
     
