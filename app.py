@@ -4,34 +4,45 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 좌측 500px 고정 레이아웃 (CSS Grid) ---
+# --- 1. 페이지 설정 및 강제 너비 고정 (CSS 최우선 순위 적용) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 화면 여백 및 배경 최적화 */
+    /* 전체 배경 및 컨테이너 여백 */
     .block-container {
         padding: 1.5rem 2rem !important;
         max-width: 100% !important;
     }
 
-    /* 핵심 해결책: 좌측 프레임을 500px로 절대 고정 */
+    /* [원인 해결] 스트림릿의 컬럼 컨테이너 자체를 Grid로 강제 변환 */
     [data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: 500px 1fr !important; /* 좌측을 500px로 확장 및 고정 */
-        gap: 2.5rem !important;
-        align-items: start !important;
+        grid-template-columns: 800px 1fr !important; /* 좌측 800px, 우측 나머지 */
+        gap: 2rem !important;
+        width: 100% !important;
     }
 
-    /* 스트림릿 기본 가변 폭 설정 무력화 */
-    [data-testid="column"] {
-        width: 100% !important; 
-        max-width: 100% !important;
-        min-width: 0 !important;
+    /* [원인 해결] 개별 컬럼의 Flex 비율을 완전히 끄고 너비 박제 */
+    [data-testid="column"]:nth-of-type(1) {
+        width: 800px !important;
+        min-width: 800px !important;
+        max-width: 800px !important;
         flex: none !important;
     }
 
-    /* 라디오 버튼 항목들이 500px 안에서 여유롭게 배치되도록 설정 */
+    [data-testid="column"]:nth-of-type(2) {
+        width: 100% !important;
+        flex: 1 !important;
+    }
+
+    /* 폼(Form) 테두리와 내부 내용물도 800px에 맞게 꽉 채우기 */
+    [data-testid="stForm"] {
+        width: 100% !important;
+        padding: 2rem !important;
+    }
+
+    /* 라디오 버튼들이 800px 안에서 넉넉하게 가로로 배치되도록 설정 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
@@ -41,18 +52,14 @@ st.markdown("""
     }
     
     div[role="radiogroup"] label {
+        flex: 0 0 auto !important;
         margin-right: 10px !important;
         white-space: nowrap !important;
-    }
-
-    /* 입력 폼 내부 간격 조정 */
-    [data-testid="stForm"] {
-        padding: 20px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기능 유지) ---
+# --- 2. 데이터 관리 로직 (기능은 절대 수정하지 않았습니다) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -101,7 +108,7 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
 # --- 3. 화면 배치 ---
-col_reg, col_list = st.columns([1, 1]) # CSS Grid가 제어하므로 설정값 무관
+col_reg, col_list = st.columns([1, 1]) # CSS Grid가 제어하므로 설정값은 무시됩니다.
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
@@ -119,9 +126,9 @@ with col_reg:
         reg_trade = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         
         if reg_cat == "주거용":
-            c1, c2 = st.columns(2)
-            with c1: reg_room = st.radio("방 개수", ["방1", "방2", "방3", "방4↑"], horizontal=True)
-            with c2: reg_bath = st.radio("화장실", ["화장실1", "화장실2", "화장실3↑"], horizontal=True)
+            c_inner1, c_inner2 = st.columns(2)
+            with c_inner1: reg_room = st.radio("방 개수", ["방1", "방2", "방3", "방4↑"], horizontal=True)
+            with c_inner2: reg_bath = st.radio("화장실", ["화장실1", "화장실2", "화장실3↑"], horizontal=True)
         else:
             reg_room, reg_bath = "", ""
 
