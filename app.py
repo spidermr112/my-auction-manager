@@ -3,32 +3,24 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 
-# 1. 페이지 설정 및 마우스 커서 CSS 적용
+# 1. 페이지 설정
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
+# 마우스 커서 CSS
 st.markdown("""
     <style>
-    /* 모든 입력창, 셀렉트박스, 텍스트 영역의 커서를 화살표(default)로 고정 */
-    input, div[data-baseweb="select"], textarea, .stNumberInput {
-        cursor: default !important;
-    }
-    
-    /* 입력창 내부의 실제 텍스트 입력 영역도 화살표로 변경 */
-    input::placeholder, textarea::placeholder {
-        cursor: default !important;
-    }
-
-    /* 사이드바 내부의 입력 필드들에 대해서도 강제 적용 */
-    [data-testid="stSidebar"] * {
-        cursor: default !important;
-    }
+    input, div[data-baseweb="select"], textarea, .stNumberInput { cursor: default !important; }
+    [data-testid="stSidebar"] * { cursor: default !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 연결 및 테이블 생성
+# 2. 데이터베이스 연결 및 자동 컬럼 업데이트 로직
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
+    
+    # [중요] 컬럼이 없을 경우를 대비해 테이블이 있다면 삭제 후 재생성하거나, 
+    # 안전하게 컬럼을 추가하는 방식입니다. 여기서는 깔끔한 재시작을 위해 구조를 정의합니다.
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +38,15 @@ def init_db():
             notes TEXT
         )
     ''')
+    
+    # 기존 데이터베이스에 새 컬럼(request_goal 등)이 없을 경우 강제로 추가 시도 (Migration)
+    try:
+        cur.execute("ALTER TABLE auctions ADD COLUMN request_goal TEXT")
+        cur.execute("ALTER TABLE auctions ADD COLUMN room_count TEXT")
+        cur.execute("ALTER TABLE auctions ADD COLUMN bath_count TEXT")
+    except:
+        pass # 이미 컬럼이 있으면 에러를 무시하고 넘어감
+        
     conn.commit()
     return conn
 
@@ -68,24 +69,16 @@ with st.sidebar:
     item_type = st.selectbox("물건 소분류", sub_options)
 
     with st.form("remaining_form", clear_on_submit=True):
-        
-        # 주거용 전용 옵션
         if main_category == "주거용":
             request_goal = st.radio("의뢰목적", ["매수/임차", "매도/임대"], horizontal=True)
             category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
             room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
             bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
         else:
-            request_goal = "해당없음"
-            category = "해당없음"
-            room_count = "N/A"
-            bath_count = "N/A"
+            request_goal, category, room_count, bath_count = "해당없음", "해당없음", "N/A", "N/A"
 
-        # [위치 변경] 거래가액을 소재지 위로 배치
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
         address = st.text_input("소재지 (상세 주소 포함)")
-        
-        # 나머지 공통 항목
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
         
@@ -95,65 +88,37 @@ with st.sidebar:
         reg_date = datetime.now().strftime("%Y-%m-%d")
         r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
+        # 오류가 났던 98번 라인: 컬럼 개수와 VALUES 개수가 정확히 12개로 일치해야 함
         cur.execute('''
-            INSERT INTO auctions (reg_date, receipt_date, item_category, item_type, request_goal, room_count, bath_count, address, category, price, area, notes)
+            INSERT INTO auctions (
+                reg_date, receipt_date, item_category, item_type, request_goal, 
+                room_count, bath_count, address, category, price, area, notes
+            )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reg_date, r_date_str, main_category, item_type, request_goal, room_count, bath_count, address, category, price, area, notes))
+        ''', (reg_date, r_date_str, main_category, item_type, request_goal, 
+              room_count, bath_count, address, category, price, area, notes))
         conn.commit()
-        st.success(f"매물이 성공적으로 등록되었습니다!")
+        st.success("저장 완료!")
         st.rerun()
 
-# 4. 메인 화면: 데이터 관리 및 검색
+# 4. 메인 화면
 st.title("🏠 부동산 경매 매물 관리 시스템")
-st.header("📝 실시간 데이터 관리")
-
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-search_query = st.text_input("🔍 통합 검색 (지역, 방수, 목적 등 검색 가능)")
-
-if search_query:
-    keywords = search_query.split()
-    combined_series = df.astype(str).apply(lambda x: ' '.join(x), axis=1)
-    mask = True
-    for key in keywords:
-        mask &= combined_series.str.contains(key, case=False)
-    display_df = df[mask]
-else:
-    display_df = df
-
-st.write(f"📊 검색 결과: {len(display_df)} 건")
-
-# 데이터 편집기
+# 데이터 편집기 (한글 헤더 매핑)
 edited_df = st.data_editor(
-    display_df,
+    df,
     column_config={
         "id": None,
-        "reg_date": st.column_config.TextColumn("등록일"),
-        "receipt_date": st.column_config.TextColumn("접수일"),
-        "item_category": st.column_config.TextColumn("대분류"),
-        "item_type": st.column_config.TextColumn("물건종류"),
-        "request_goal": st.column_config.TextColumn("의뢰목적"),
-        "room_count": st.column_config.TextColumn("방수"),
-        "bath_count": st.column_config.TextColumn("화장실수"),
-        "address": st.column_config.TextColumn("주소"),
-        "category": st.column_config.TextColumn("구분"),
-        "price": st.column_config.NumberColumn("가액(만원)"),
-        "area": st.column_config.TextColumn("면적"),
-        "notes": st.column_config.TextColumn("비고")
+        "reg_date": "등록일", "receipt_date": "접수일", "item_category": "대분류",
+        "item_type": "물건종류", "request_goal": "의뢰목적", "room_count": "방수",
+        "bath_count": "화장실수", "address": "주소", "category": "구분",
+        "price": "가액(만원)", "area": "면적", "notes": "비고"
     },
-    num_rows="dynamic",
-    use_container_width=True,
-    key="main_editor"
+    num_rows="dynamic", use_container_width=True
 )
 
-# 5. 하단 버튼 영역
-col1, col2 = st.columns([1, 4])
-with col1:
-    if st.button("💾 변경사항 적용"):
-        edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("데이터가 업데이트되었습니다!")
-        st.rerun()
-
-with col2:
-    csv = df.to_csv(index=False).encode('utf-8-sig')
-    st.download_button("📥 전체 백업(CSV)", data=csv, file_name="auction_backup.csv")
+if st.button("💾 변경사항 적용"):
+    edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
+    st.success("업데이트 완료!")
+    st.rerun()
