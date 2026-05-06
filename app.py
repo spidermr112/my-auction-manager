@@ -4,9 +4,10 @@ import pandas as pd
 import re
 from datetime import datetime
 
-# 1. 페이지 설정 및 엔터 키 제어
-st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
+# 1. 페이지 설정 (브라우저 탭 이름 변경)
+st.set_page_config(page_title="파크부동산", layout="wide")
 
+# 한글 금액 변환 함수
 def format_korean_price(price_manwon):
     if price_manwon is None or price_manwon == 0: return "0원"
     eok = price_manwon // 10000
@@ -16,6 +17,7 @@ def format_korean_price(price_manwon):
     if man > 0: result.append(f"{int(man):,}만원")
     return " ".join(result)
 
+# 엔터 키 동작 및 스타일 적용
 st.markdown("""
     <script>
     document.addEventListener('keydown', function(e) {
@@ -33,12 +35,19 @@ st.markdown("""
     input, textarea, .stNumberInput { cursor: default !important; }
     [data-testid="stSidebar"] * { cursor: default !important; }
     div[data-testid="stWidgetLabel"] { font-weight: bold; margin-bottom: -5px; }
+    /* 타이틀 스타일 강조 */
+    .main-title {
+        font-size: 45px !important;
+        color: #2E5077;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # 2. DB 초기화
 def init_db():
-    conn = sqlite3.connect('auction_data.db', check_same_thread=False)
+    conn = sqlite3.connect('park_real_estate.db', check_same_thread=False)
     cur = conn.cursor()
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
@@ -54,9 +63,10 @@ def init_db():
 
 conn = init_db()
 
-# 3. 사이드바: 매물 등록
+# 3. 사이드바: 매물 등록 (파크부동산 전용 UI)
 with st.sidebar:
-    st.subheader("🏠 매물 등록")
+    st.image("https://cdn-icons-png.flaticon.com/512/609/609803.png", width=50)
+    st.subheader("📍 매물 등록")
     
     receipt_date = st.date_input("접수일", value=datetime.now())
     
@@ -71,10 +81,9 @@ with st.sidebar:
     }
     item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
 
-    # [의뢰목적] 라디오 버튼 (복수선택 제거하여 깔끔하게 통일)
+    # [의뢰목적] 라디오 버튼
     request_goal = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
 
-    # 임대/매매 여부 판단
     is_lease = request_goal in ["임대", "임차"]
     is_sale = request_goal in ["매도", "매수", "교환"]
 
@@ -86,7 +95,7 @@ with st.sidebar:
     else:
         category, room_count, bath_count = "", "", ""
 
-    # 금액 입력부
+    # 금액 입력
     deposit, monthly_rent, converted_deposit, price = 0, 0, 0, 0
     if is_lease:
         col1, col2 = st.columns(2)
@@ -99,7 +108,7 @@ with st.sidebar:
 
     if is_sale:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
-        if price: st.info(f"💰 **거래가액 확인: {format_korean_price(price)}**")
+        if price: st.info(f"💰 **가액 확인: {format_korean_price(price)}**")
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
@@ -138,18 +147,25 @@ with st.sidebar:
         except Exception as e:
             st.error(f"❌ 저장 오류 발생: {e}")
 
-# 4. 메인 화면
-st.title("🏠 부동산 경매 매물 관리 시스템")
+# 4. 메인 화면 (제목: 파크부동산)
+st.markdown('<p class="main-title">🏘️ 파크부동산</p>', unsafe_allow_html=True)
+
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
 if not df.empty:
     st.data_editor(
         df,
         column_config={
-            "id": None, "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
+            "id": None, 
+            "reg_date": "등록일",
+            "receipt_date": "접수일",
+            "price": st.column_config.NumberColumn("가액(만원)", format="%d"),
             "deposit": st.column_config.NumberColumn("보증금", format="%d"),
             "monthly_rent": st.column_config.NumberColumn("차임", format="%d"),
             "converted_deposit": st.column_config.NumberColumn("환산보증금", format="%d"),
+            "notes": "특약/분석"
         },
         num_rows="dynamic", use_container_width=True
     )
+else:
+    st.info("등록된 매물이 없습니다. 왼쪽 사이드바에서 매물을 등록해 주세요.")
