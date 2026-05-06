@@ -33,34 +33,46 @@ def create_empty_df():
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
 
-# --- 금액 한글 변환 함수 (핵심!) ---
+# --- 금액 한글 및 월세 환산 변환 함수 (핵심!) ---
 def parse_korean_price(price_str):
-    """'3억 5천' 또는 '3.5억' 등을 만원 단위 숫자로 변환"""
-    if not price_str: return 0
+    """
+    1. '3억 5천' -> 35000 (만원)
+    2. '4000/35' -> '4000/35 (환산 7500)' 형태의 문자열 반환
+    """
+    if not price_str: return "0"
+    
+    # 월세 형태 (보증금/월세) 체크
+    if '/' in price_str:
+        try:
+            parts = price_str.split('/')
+            deposit = int(re.sub(r'[^0-9]', '', parts[0]))
+            monthly = int(re.sub(r'[^0-9]', '', parts[1]))
+            hwan_san = deposit + (monthly * 100)
+            return f"{price_str} (환산 {hwan_san})"
+        except:
+            return price_str
+
+    # 일반 한글 금액 변환
     try:
-        # 숫자만 있으면 그대로 반환
         if price_str.isdigit():
-            return int(price_str)
+            return price_str
         
         result = 0
-        # '억' 단위 추출
         eok_match = re.search(r'([\d\.]+)\s*억', price_str)
         if eok_match:
             result += float(eok_match.group(1)) * 10000
         
-        # '천' 단위 추출 (억 뒤에 오는 천 또는 그냥 천)
         cheon_match = re.search(r'([\d\.]+)\s*천', price_str)
         if cheon_match:
             result += float(cheon_match.group(1)) * 100
             
-        # 만약 '억', '천'이 없는데 숫자만 섞여있는 경우 처리
         if not eok_match and not cheon_match:
             num_only = re.sub(r'[^0-9]', '', price_str)
-            return int(num_only) if num_only else 0
+            return num_only if num_only else "0"
             
-        return int(result)
+        return str(int(result))
     except:
-        return 0
+        return price_str
 
 # 세션 상태 초기화
 if 'data' not in st.session_state:
@@ -100,8 +112,9 @@ with col_reg:
         else:
             reg_room, reg_bath = "N/A", "N/A"
         
-        # [수정] 거래가액을 텍스트로 입력받음
-        reg_price_raw = st.text_input("거래가액(만원 또는 '3억 5천')", key="k_price_raw", help="'3억', '5천' 등 한글 입력이 가능합니다.")
+        # [수정] 요청하신 입력창 이름으로 변경
+        reg_price_raw = st.text_input("거래가액(*만, 보증금/월차임)", key="k_price_raw", help="예: 3억 5천 / 4000/35 / 5000")
+        
         reg_addr = st.text_input("소재지 상세", key="k_addr")
         reg_area_raw = st.text_input("면적(평 or ㎡ 둘다 가능)", key="k_area_raw")
         reg_desc = st.text_area("특약내용", key="k_desc")
@@ -109,10 +122,11 @@ with col_reg:
         if st.button("🏠 데이터베이스 저장", use_container_width=True, key="k_save_btn"):
             current_time = time.time()
             
+            # 중복 클릭 방지 (2초)
             if current_time - st.session_state.last_submit_time > 2.0:
                 st.session_state.last_submit_time = current_time
                 
-                # 한글 금액 -> 숫자 변환
+                # 가액 변환 (월세 환산 포함)
                 final_price = parse_korean_price(reg_price_raw)
                 
                 # 평 수 변환
@@ -139,7 +153,7 @@ with col_reg:
                 
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
                 save_data(st.session_state.data)
-                st.success(f"저장 완료! (입력 금액: {final_price}만원)")
+                st.success(f"저장 완료! (표시 가액: {final_price})")
                 time.sleep(0.5)
                 st.rerun()
 
