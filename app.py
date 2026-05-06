@@ -5,9 +5,9 @@ from datetime import datetime
 # --- 페이지 설정 ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
-# --- 데이터 로드 및 초기화 (세션 상태 활용) ---
-if 'data' not in st.session_state:
-    # 'status' 컬럼을 추가하여 진행중/거래완료 상태 관리
+# --- 데이터 로드 및 초기화 (KeyError 방지 로직 추가) ---
+if 'data' not in st.session_state or 'status' not in st.session_state.data.columns:
+    # 데이터가 없거나, 기존 데이터에 'status' 열이 없는 경우 새로 초기화
     st.session_state.data = pd.DataFrame(columns=[
         "id", "receipt_date", "item_category", "item_sub_category", 
         "purpose", "trade_type", "price", "address", "area", "description", "status"
@@ -16,11 +16,11 @@ if 'data' not in st.session_state:
 # --- 레이아웃 구성 ---
 col_reg, col_list = st.columns([1, 2.5])
 
-# --- [좌측] 매물 등록 파트 (실시간 소분류 변경 포함) ---
+# --- [좌측] 매물 등록 파트 ---
 with col_reg:
     st.subheader("📍 신규 매물 등록")
     
-    # 폼(form)을 사용하지 않아야 대분류 클릭 시 소분류가 즉시 바뀝니다.
+    # 실시간 반영을 위해 st.form을 사용하지 않음
     receipt_date = st.date_input("접수일", datetime.now())
     
     # 1. 대분류 선택
@@ -34,7 +34,7 @@ with col_reg:
     else:  # 토지
         sub_options = ["대지", "임야", "농지", "기타"]
     
-    # 3. 소분류 라디오 버튼 (위에 설정한 sub_options가 즉시 적용됨)
+    # 3. 소분류 라디오 버튼
     item_sub_category = st.radio("물건 소분류", sub_options, horizontal=True)
     
     purpose = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
@@ -60,7 +60,7 @@ with col_reg:
                 "address": address, 
                 "area": area, 
                 "description": description,
-                "status": "진행중"  # 등록 시 기본 상태
+                "status": "진행중"
             }])
             st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
             st.success(f"[{item_sub_category}] 등록 완료!")
@@ -68,23 +68,25 @@ with col_reg:
         else:
             st.error("소재지 상세 주소를 입력해주세요.")
 
-# --- [우측] 매물 목록 및 색인 파트 (거래완료 관리 포함) ---
+# --- [우측] 매물 목록 및 색인 파트 ---
 with col_list:
     st.title("🏘️ 파크부동산 매물 대장")
     
-    # 상단 검색 필터
     search_query = st.text_input("🔍 키워드 검색 (주소 등)", placeholder="검색어를 입력하세요.")
 
     st.write("---")
     
     if not st.session_state.data.empty:
-        # 데이터 복사 및 필터링
         display_df = st.session_state.data.copy()
+        
+        # 키워드 검색 적용
         if search_query:
-            display_df = display_df[display_df['address'].str.contains(search_query) | 
-                                    display_df['description'].str.contains(search_query)]
+            display_df = display_df[
+                display_df['address'].str.contains(search_query, na=False) | 
+                display_df['description'].str.contains(search_query, na=False)
+            ]
 
-        # 탭 구분: 진행중 매물 vs 거래완료 목록
+        # 탭 구분
         tab1, tab2 = st.tabs(["✅ 진행중 매물", "🏁 거래완료 목록"])
         
         with tab1:
@@ -92,18 +94,15 @@ with col_list:
             if active_items.empty:
                 st.info("현재 진행 중인 매물이 없습니다.")
             else:
-                # 각 매물을 개별 카드로 표시 (거래완료 버튼 포함)
                 for i, row in active_items.iterrows():
-                    with st.expander(f"📍 {row['address']} [{row['item_sub_category']} / {row['trade_type']}] - {row['price']}만원"):
+                    with st.expander(f"📍 {row['address']} [{row['item_sub_category']}] - {row['price']}만원"):
                         c1, c2 = st.columns([4, 1])
                         with c1:
-                            st.write(f"**접수일:** {row['receipt_date']} | **면적:** {row['area']}")
+                            st.write(f"**접수일:** {row['receipt_date']} | **종류:** {row['trade_type']} | **면적:** {row['area']}")
                             st.write(f"**특약:** {row['description']}")
                         with c2:
-                            # 거래 완료 버튼 클릭 시 상태 업데이트
-                            if st.button("거래완료", key=f"btn_{row['id']}"):
+                            if st.button("거래완료", key=f"done_{row['id']}"):
                                 st.session_state.data.loc[st.session_state.data['id'] == row['id'], 'status'] = "거래완료"
-                                st.success("거래 완료 처리되었습니다.")
                                 st.rerun()
                 
                 st.write("")
