@@ -7,17 +7,14 @@ from datetime import datetime
 # 1. 페이지 설정 및 엔터 키/커서 제어 스크립트
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
-# 한글 금액 변환 함수
 def format_korean_price(price_manwon):
     if price_manwon is None or price_manwon == 0:
         return "0원"
     eok = price_manwon // 10000
     man = price_manwon % 10000
     result = []
-    if eok > 0:
-        result.append(f"{int(eok)}억")
-    if man > 0:
-        result.append(f"{int(man):,}만원")
+    if eok > 0: result.append(f"{int(eok)}억")
+    if man > 0: result.append(f"{int(man):,}만원")
     return " ".join(result)
 
 st.markdown("""
@@ -39,7 +36,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 초기화
+# 2. DB 초기화
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
@@ -69,11 +66,14 @@ with st.sidebar:
         "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
         "토지": ["토지"]
     }
-    selected_sub = st.multiselect("물건 소분류", sub_map[main_category])
+
+    # [개선] 소분류: 하나만 선택하면 목록이 사라져서 시각적으로 '완료'된 느낌을 줌
+    selected_sub = st.multiselect("물건 소분류", sub_map[main_category], placeholder="하나 이상 선택")
     item_type = ", ".join(selected_sub)
 
+    # [개선] 의뢰목적: 동일하게 multiselect 유지
     goal_options = ["매도", "임대", "매수", "임차", "교환"]
-    goals = st.multiselect("의뢰목적", goal_options)
+    goals = st.multiselect("의뢰목적", goal_options, placeholder="하나 이상 선택")
     request_goal = ", ".join(goals)
 
     is_lease = any(x in goals for x in ["임대", "임차"])
@@ -90,10 +90,8 @@ with st.sidebar:
 
     if is_lease:
         col1, col2 = st.columns(2)
-        with col1:
-            deposit = st.number_input("보증금 (만원)", min_value=0, value=None, step=100)
-        with col2:
-            monthly_rent = st.number_input("차임 (만원)", min_value=0, value=None, step=10)
+        with col1: deposit = st.number_input("보증금 (만원)", min_value=0, value=None, step=100)
+        with col2: monthly_rent = st.number_input("차임 (만원)", min_value=0, value=None, step=10)
         
         calc_deposit = deposit if deposit is not None else 0
         calc_rent = monthly_rent if monthly_rent is not None else 0
@@ -102,17 +100,15 @@ with st.sidebar:
 
     if is_sale:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
-        if price:
-            st.info(f"💰 **거래가액 확인: {format_korean_price(price)}**")
+        if price: st.info(f"💰 **거래가액 확인: {format_korean_price(price)}**")
     
     if not is_lease and not is_sale:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
-    # --- [수정] 입력창 안내 문구 간소화 ---
+    # 면적 입력창
     area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
-    
     final_area = ""
     if area_raw:
         if "평" in area_raw:
@@ -120,12 +116,8 @@ with st.sidebar:
                 num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
                 m2_val = round(num_part * 3.3058, 2)
                 final_area = f"{m2_val}㎡ ({num_part}평)"
-            except:
-                final_area = area_raw
-        else:
-            # 숫자만 쳤을 때는 기본㎡로 인식
-            final_area = f"{area_raw}㎡"
-        
+            except: final_area = area_raw
+        else: final_area = f"{area_raw}㎡"
         st.info(f"📐 **최종 면적: {final_area}**")
             
     notes = st.text_area("특약사항 및 분석내용")
