@@ -22,11 +22,6 @@ st.markdown("""
     [data-testid="stSidebar"] * {
         cursor: default !important;
     }
-    
-    /* 라디오 버튼 간격 조절 (선택사항: 너무 다닥다닥 붙지 않게) */
-    div[data-testid="stWidgetLabel"] {
-        margin-bottom: -10px;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -74,18 +69,11 @@ with st.sidebar:
 
     with st.form("remaining_form", clear_on_submit=True):
         
-        # [핵심 수정] 주거용일 때 모든 선택 옵션을 라디오 버튼 디자인으로 통일
+        # 주거용 전용 옵션
         if main_category == "주거용":
-            # 1. 의뢰목적
             request_goal = st.radio("의뢰목적", ["매수/임차", "매도/임대"], horizontal=True)
-            
-            # 2. 구분
             category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
-            
-            # 3. 방 개수 (라디오 버튼으로 변경)
             room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
-            
-            # 4. 화장실 개수 (라디오 버튼으로 변경하여 통일성 유지)
             bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
         else:
             request_goal = "해당없음"
@@ -93,8 +81,11 @@ with st.sidebar:
             room_count = "N/A"
             bath_count = "N/A"
 
-        address = st.text_input("소재지 (상세 주소 포함)")
+        # [위치 변경] 거래가액을 소재지 위로 배치
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
+        address = st.text_input("소재지 (상세 주소 포함)")
+        
+        # 나머지 공통 항목
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
         
@@ -160,7 +151,7 @@ col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("데이터가 성공적으로 업데이트되었습니다!")
+        st.success("데이터가 업데이트되었습니다!")
         st.rerun()
 
 with col2:
