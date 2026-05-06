@@ -21,7 +21,6 @@ def init_db():
     conn = sqlite3.connect(db_name, check_same_thread=False)
     cur = conn.cursor()
     
-    # 테이블 생성 (모든 컬럼이 빈 값을 허용하도록 설정)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -40,7 +39,7 @@ def init_db():
         )
     ''')
     
-    # 기존 DB에 컬럼 누락 시 자동 추가 (OperationalError 방지)
+    # 컬럼 누락 방지 (OperationalError 예방)
     columns = [col[1] for col in cur.execute("PRAGMA table_info(auctions)").fetchall()]
     check_cols = ["request_goal", "room_count", "bath_count", "receipt_date"]
     for col in check_cols:
@@ -77,7 +76,8 @@ with st.sidebar:
         else:
             request_goal, category, room_count, bath_count = "", "", "", ""
 
-        price = st.number_input("거래가액 (만원)", min_value=0, step=100)
+        # [수정] 거래가액 기본값을 5000으로 설정
+        price = st.number_input("거래가액 (만원)", min_value=0, value=5000, step=100)
         address = st.text_input("소재지 (상세 주소 포함)")
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
@@ -85,7 +85,6 @@ with st.sidebar:
         submit_button = st.form_submit_button("🏠 데이터베이스에 저장")
 
     if submit_button:
-        # [수정] 소재지 필수 체크 로직 삭제 -> 빈칸이어도 저장 진행
         reg_date_str = datetime.now().strftime("%Y-%m-%d")
         r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
@@ -100,7 +99,7 @@ with st.sidebar:
             ''', (reg_date_str, r_date_str, main_category, item_type, request_goal, 
                   room_count, bath_count, address, category, price, area, notes))
             conn.commit()
-            st.success("✅ 저장이 완료되었습니다! (빈칸 포함)")
+            st.success("✅ 저장이 완료되었습니다!")
             st.rerun()
         except Exception as e:
             st.error(f"❌ 저장 중 오류 발생: {e}")
@@ -111,7 +110,6 @@ st.title("🏠 부동산 경매 매물 관리 시스템")
 try:
     df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
     if not df.empty:
-        # 데이터 편집기 (한글 헤더)
         edited_df = st.data_editor(
             df,
             column_config={
@@ -129,6 +127,6 @@ try:
             st.success("🔄 데이터가 업데이트되었습니다!")
             st.rerun()
     else:
-        st.info("등록된 매물이 없습니다. 왼쪽 사이드바에서 등록해 주세요.")
+        st.info("등록된 매물이 없습니다.")
 except:
     st.warning("데이터베이스를 준비 중입니다...")
