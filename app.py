@@ -3,21 +3,19 @@ import pandas as pd
 from datetime import datetime
 import os
 import re
-import time
 
-# --- 1. 페이지 설정 및 레이아웃 강제 고정 (핵심 수정) ---
+# --- 1. 페이지 설정 및 레이아웃 박제 (CSS) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 컨테이너 여백 최적화 */
+    /* 1. 전체 여백 최적화 */
     .block-container {
-        padding-top: 1.5rem !important;
-        padding-bottom: 1rem !important;
-        max-width: 98% !important; /* 화면을 최대한 넓게 쓰되 여백 유지 */
+        padding: 1.5rem 2rem !important;
+        max-width: 100% !important;
     }
 
-    /* 좌우 컬럼 배치 강제 고정 */
+    /* 2. 좌측(400px 고정) / 우측(가변 확장) 레이아웃 강제 고정 */
     [data-testid="stHorizontalBlock"] {
         display: flex !important;
         flex-direction: row !important;
@@ -25,34 +23,44 @@ st.markdown("""
         gap: 2rem !important;
     }
 
-    /* [좌측 등록창] 400px로 절대 고정 - 브라우저가 넓어져도 변하지 않음 */
+    /* 좌측 컬럼: 400px 절대값 박제 */
     [data-testid="column"]:nth-of-type(1) {
+        flex: 0 0 400px !important;
         width: 400px !important;
         min-width: 400px !important;
         max-width: 400px !important;
-        flex: 0 0 400px !important;
     }
 
-    /* [우측 목록창] 나머지 모든 공간을 차지하며 유동적으로 확장 */
+    /* 우측 컬럼: 나머지 무한 확장 */
     [data-testid="column"]:nth-of-type(2) {
         flex: 1 1 auto !important;
         min-width: 0 !important;
     }
 
-    /* 라디오 버튼 가로 정렬 및 줄바꿈 방지 */
+    /* 3. 라디오 버튼 벌어짐 방지 (대표님이 지적하신 핵심 부분) */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 12px !important;
+        justify-content: flex-start !important; /* 왼쪽으로 딱 붙임 */
+        gap: 15px !important; /* 항목 간 간격을 일정하게 유지 */
     }
-    div[role="radiogroup"] label {
-        white-space: nowrap !important;
+
+    /* 라디오 버튼 각각의 항목이 넓게 퍼지지 않도록 설정 */
+    div[role="radiogroup"] > label {
+        flex: 0 0 auto !important; 
+        width: auto !important;
+        margin-right: 5px !important;
+    }
+
+    /* 4. 입력창 및 버튼 너비가 박스(400px)를 넘지 않게 조정 */
+    .stTextInput, .stTextArea, .stDateInput, .stButton {
+        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기존 기능 유지) ---
+# --- 2. 데이터 관리 로직 (기능 일절 수정 없음) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -100,8 +108,8 @@ def parse_flexible_price(price_str):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# --- 3. 화면 배치 ---
-col_reg, col_list = st.columns([1, 2.2]) # 설정과 상관없이 CSS가 우선 적용됨
+# --- 3. 화면 구성 ---
+col_reg, col_list = st.columns([1, 4]) # CSS에서 강제 조정하므로 비율 의미 없음
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
