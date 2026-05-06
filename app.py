@@ -8,17 +8,29 @@ import time
 # --- 1. 페이지 설정 및 디자인 고정 ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
-# 사이드바 폭 고정 및 UI 가독성을 위한 CSS
+# 사이드바 폭 고정 및 [줄바꿈 방지] CSS 추가
 st.markdown("""
     <style>
     [data-testid="stSidebar"] {
         min-width: 350px;
         max-width: 350px;
     }
+    /* 체크박스 옆 글자가 절대 줄바꿈되지 않도록 강제 설정 */
+    .stCheckbox label {
+        white-space: nowrap !important;
+        word-break: keep-all !important;
+        min-width: max-content !important;
+    }
     .filter-label {
         color: red;
         font-weight: bold;
-        font-size: 16px;
+        font-size: 15px;
+        white-space: nowrap;
+    }
+    /* 컬럼 간격 미세 조정 */
+    [data-testid="column"] {
+        padding-right: 5px !important;
+        padding-left: 5px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -135,55 +147,52 @@ s_query = st.text_input("🔍 키워드 검색 (주소, 특약 등)", placeholde
 
 # [필터 상세 선택 섹션]
 with st.expander("✅ 필터 상세 선택", expanded=True):
-    # 1. 주거용 라인 (체크박스 기능 부여)
-    c1, c2, c3, c4, c5, c6 = st.columns([1, 1, 1.2, 1, 1, 4])
-    with c1: f_ju = st.checkbox("주거용", key="f_ju") # 대표 체크박스
-    f_yeon = c2.checkbox("연립/다세대", key="f_yeon")
-    f_dan = c3.checkbox("단독/다가구", key="f_dan")
-    f_jeon = c4.checkbox("전원주택", key="f_jeon")
-    f_apt = c5.checkbox("아파트", key="f_apt")
-    f_op = c6.checkbox("오피스텔(주거)", key="f_op")
+    # 1. 주거용 라인
+    c = st.columns([1, 1.2, 1.2, 1, 1, 1.5])
+    f_ju = c[0].checkbox("주거용", key="f_ju")
+    f_yeon = c[1].checkbox("연립/다세대", key="f_yeon")
+    f_dan = c[2].checkbox("단독/다가구", key="f_dan")
+    f_jeon = c[3].checkbox("전원주택", key="f_jeon")
+    f_apt = c[4].checkbox("아파트", key="f_apt")
+    f_op = c[5].checkbox("오피스텔(주거)", key="f_op")
 
-    # 2. 비주거용 라인 (체크박스 기능 부여)
-    b1, b2, b3, b4, b5, b6 = st.columns([1, 1, 1, 1, 1, 4])
-    with b1: f_bi = st.checkbox("비주거용", key="f_bi") # 대표 체크박스
-    f_sang = b2.checkbox("상가/사무실", key="f_sang")
-    f_gong = b3.checkbox("공장/창고", key="f_gong")
-    f_build = b4.checkbox("빌딩/건물", key="f_build")
-    f_jisik = b5.checkbox("지식산업센터", key="f_jisik")
-    f_etc_non = b6.checkbox("기타", key="f_etc_non")
+    # 2. 비주거용 라인
+    b = st.columns([1, 1.2, 1, 1, 1.2, 1.5])
+    f_bi = b[0].checkbox("비주거용", key="f_bi")
+    f_sang = b[1].checkbox("상가/사무실", key="f_sang")
+    f_gong = b[2].checkbox("공장/창고", key="f_gong")
+    f_build = b[3].checkbox("빌딩/건물", key="f_build")
+    f_jisik = b[4].checkbox("지식산업센터", key="f_jisik")
+    f_etc_non = b[5].checkbox("기타", key="f_etc_non")
 
-    # 3. 토지 라인 (체크박스 기능 부여)
-    l1, l2, l3, l4, l5, l6 = st.columns([1, 1, 1, 1, 1, 4])
-    with l1: f_to = st.checkbox("토지", key="f_to") # 대표 체크박스
-    f_dae = l2.checkbox("대지", key="f_dae")
-    f_imya = l3.checkbox("임야", key="f_imya")
-    f_nong = l4.checkbox("농지", key="f_nong")
-    f_etc_land = l5.checkbox("기타 ", key="f_etc_land")
+    # 3. 토지 라인
+    l = st.columns([1, 1, 1, 1, 1, 1.5])
+    f_to = l[0].checkbox("토지", key="f_to")
+    f_dae = l[1].checkbox("대지", key="f_dae")
+    f_imya = l[2].checkbox("임야", key="f_imya")
+    f_nong = l[3].checkbox("농지", key="f_nong")
+    f_etc_land = l[4].checkbox("기타 ", key="f_etc_land")
 
     st.markdown("---")
 
     # 통합 의뢰목적 및 옵션 라인
-    m1, m2, m3, m4, m5, m6, m7, m8, m9 = st.columns([1.5, 1.5, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7])
-    f_sell_rent = m1.checkbox("매도/임대", key="f_sell_rent")
-    f_buy_lease = m2.checkbox("매수/임차", key="f_buy_lease")
+    m = st.columns([1.5, 1.5, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7, 0.7])
+    f_sell_rent = m[0].checkbox("매도/임대", key="f_sell_rent")
+    f_buy_lease = m[1].checkbox("매수/임차", key="f_buy_lease")
     
-    f_r1 = m3.checkbox("방1")
-    f_r2 = m4.checkbox("방2")
-    f_r3 = m5.checkbox("방3")
-    f_r4 = m6.checkbox("방4")
-    f_b1 = m7.checkbox("욕1")
-    f_b2 = m8.checkbox("욕2")
-    f_b3 = m9.checkbox("욕3")
+    f_r1 = m[2].checkbox("방1")
+    f_r2 = m[3].checkbox("방2")
+    f_r3 = m[4].checkbox("방3")
+    f_r4 = m[5].checkbox("방4")
+    f_b1 = m[6].checkbox("욕1")
+    f_b2 = m[7].checkbox("욕2")
+    f_b3 = m[8].checkbox("욕3")
 
-# --- 데이터 필터링 로직 (수정된 핵심 로직) ---
+# --- 데이터 필터링 로직 ---
 df_display = st.session_state.data.copy()
-
 selected_subs = []
 
-# [주거용 그룹 필터링]
-if f_ju:
-    selected_subs.extend(["연립/다세대", "단독/다가구", "전원주택", "아파트", "오피스텔(주거)"])
+if f_ju: selected_subs.extend(["연립/다세대", "단독/다가구", "전원주택", "아파트", "오피스텔(주거)"])
 else:
     if f_yeon: selected_subs.append("연립/다세대")
     if f_dan: selected_subs.append("단독/다가구")
@@ -191,9 +200,7 @@ else:
     if f_apt: selected_subs.append("아파트")
     if f_op: selected_subs.append("오피스텔(주거)")
 
-# [비주거용 그룹 필터링]
-if f_bi:
-    selected_subs.extend(["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"])
+if f_bi: selected_subs.extend(["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"])
 else:
     if f_sang: selected_subs.append("상가/사무실")
     if f_gong: selected_subs.append("공장/창고")
@@ -201,21 +208,17 @@ else:
     if f_jisik: selected_subs.append("지식산업센터")
     if f_etc_non: selected_subs.append("기타")
 
-# [토지 그룹 필터링]
-if f_to:
-    selected_subs.extend(["대지", "임야", "농지", "기타 "])
+if f_to: selected_subs.extend(["대지", "임야", "농지", "기타 "])
 else:
     if f_dae: selected_subs.append("대지")
     if f_imya: selected_subs.append("임야")
     if f_nong: selected_subs.append("농지")
     if f_etc_land: selected_subs.append("기타 ")
 
-# 소분류 필터 적용
 if selected_subs:
-    selected_subs = list(set(selected_subs)) # 중복 제거
+    selected_subs = list(set(selected_subs))
     df_display = df_display[df_display['item_sub_category'].isin(selected_subs)]
 
-# 통합 의뢰목적 필터 적용
 selected_purps = []
 if f_sell_rent: selected_purps.extend(["매도", "임대"])
 if f_buy_lease: selected_purps.extend(["매수", "임차"])
@@ -223,15 +226,12 @@ if f_buy_lease: selected_purps.extend(["매수", "임차"])
 if selected_purps:
     df_display = df_display[df_display['purpose'].isin(selected_purps)]
 
-# 키워드 검색 필터 적용
 if s_query:
     df_display = df_display[df_display.apply(lambda r: s_query in str(r.values), axis=1)]
 
-# 결과 테이블 출력
 st.subheader(f"📊 매물 목록 (총 {len(df_display)}건)")
 st.dataframe(df_display.drop(columns=['id'], errors='ignore'), use_container_width=True, hide_index=True)
 
-# 초기화 버튼
 if st.button("🗑️ 전체 데이터 초기화"):
     if st.checkbox("정말 삭제하시겠습니까?"):
         st.session_state.data = create_empty_df()
