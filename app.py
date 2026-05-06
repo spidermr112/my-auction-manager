@@ -37,7 +37,7 @@ def save_data(df):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# [추가] 중복 클릭 방지를 위한 상태값
+# 중복 클릭 방지 상태값
 if 'last_submit_time' not in st.session_state:
     st.session_state.last_submit_time = 0
 
@@ -74,18 +74,20 @@ with col_reg:
         
         reg_price = st.number_input("거래가액(만원)", min_value=0, step=100, key="k_price")
         reg_addr = st.text_input("소재지 상세", key="k_addr")
-        reg_area_raw = st.text_input("면적 (예: 30평)", key="k_area_raw")
+        
+        # [수정] 입력란 이름 변경 및 도움말 추가
+        reg_area_raw = st.text_input("면적(평 or ㎡ 둘다 가능)", key="k_area_raw", help="'평'을 붙여 입력하면 ㎡로 자동 변환됩니다.")
+        
         reg_desc = st.text_area("특약내용", key="k_desc")
         
-        # 버튼 클릭 시 처리
         if st.button("🏠 데이터베이스 저장", use_container_width=True, key="k_save_btn"):
             current_time = time.time()
             
-            # [중복 방지 핵심] 마지막 클릭 후 2초 이내의 클릭은 무시
+            # [중복 클릭 방지] 2초 이내 재클릭 차단
             if current_time - st.session_state.last_submit_time > 2.0:
                 st.session_state.last_submit_time = current_time
                 
-                # 평 수 변환 로직
+                # 평 수 변환 로직 (특수문자 ㎡ 적용)
                 final_area = reg_area_raw
                 if reg_area_raw and '평' in reg_area_raw:
                     try:
@@ -93,7 +95,7 @@ with col_reg:
                         if num_only:
                             pyung = float(num_only)
                             m2 = round(pyung * 3.3058, 2)
-                            final_area = f"{m2}㎡({pyung}평)"
+                            final_area = f"{m2}㎡({pyung}평)" # 가독성 좋은 특수문자 사용
                     except:
                         pass
                 
@@ -110,12 +112,9 @@ with col_reg:
                 
                 st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
                 save_data(st.session_state.data)
-                st.success("저장 완료!")
-                time.sleep(0.5) # 성공 메시지 보여줄 시간
+                st.success("매물이 안전하게 저장되었습니다.")
+                time.sleep(0.5)
                 st.rerun()
-            else:
-                # 너무 빨리 클릭했을 경우 무시
-                pass
 
 # --- [우측] 매물 목록 및 색인 ---
 with col_list:
