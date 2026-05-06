@@ -39,7 +39,7 @@ def init_db():
         )
     ''')
     
-    # 컬럼 누락 방지 (OperationalError 예방)
+    # 컬럼 누락 방지
     columns = [col[1] for col in cur.execute("PRAGMA table_info(auctions)").fetchall()]
     check_cols = ["request_goal", "room_count", "bath_count", "receipt_date"]
     for col in check_cols:
@@ -76,8 +76,8 @@ with st.sidebar:
         else:
             request_goal, category, room_count, bath_count = "", "", "", ""
 
-        # [수정] 거래가액 기본값을 5000으로 설정
-        price = st.number_input("거래가액 (만원)", min_value=0, value=5000, step=100)
+        # [수정] value=None으로 설정하여 빈칸에서 시작하도록 변경
+        price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100, placeholder="숫자를 입력하세요")
         address = st.text_input("소재지 (상세 주소 포함)")
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
