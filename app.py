@@ -15,21 +15,13 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 초기화 로직 (구조 강제 재설정)
+# 2. 데이터베이스 초기화 로직
 def init_db():
     db_name = 'auction_data.db'
-    
-    # [핵심 조치] 만약 receipt_date가 없어서 에러가 난다면, 
-    # 아래 주석(#)을 한 번만 풀고 실행해서 DB를 삭제하거나, 
-    # 아예 테이블을 DROP 하고 새로 만듭니다.
     conn = sqlite3.connect(db_name, check_same_thread=False)
     cur = conn.cursor()
     
-    # 기존 테이블에 문제가 있을 경우 삭제하고 새로 생성 (초기화)
-    # ※ 주의: 기존에 저장된 데이터가 삭제됩니다. 
-    # 데이터가 중요하다면 ALTER TABLE을 써야 하지만, 현재는 구조가 많이 꼬여있으므로 재생성을 추천합니다.
-    cur.execute("DROP TABLE IF EXISTS auctions") 
-    
+    # 테이블 생성 (모든 컬럼이 빈 값을 허용하도록 설정)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,16 +39,18 @@ def init_db():
             notes TEXT
         )
     ''')
+    
+    # 기존 DB에 컬럼 누락 시 자동 추가 (OperationalError 방지)
+    columns = [col[1] for col in cur.execute("PRAGMA table_info(auctions)").fetchall()]
+    check_cols = ["request_goal", "room_count", "bath_count", "receipt_date"]
+    for col in check_cols:
+        if col not in columns:
+            cur.execute(f"ALTER TABLE auctions ADD COLUMN {col} TEXT")
+            
     conn.commit()
     return conn
 
-# 처음 실행할 때만 DB를 초기화합니다.
-# 이미 데이터가 있고 구조만 바꾸고 싶다면 위 DROP 문을 지우고 실행하세요.
-if 'db_initialized' not in st.session_state:
-    conn = init_db()
-    st.session_state['db_initialized'] = True
-else:
-    conn = sqlite3.connect('auction_data.db', check_same_thread=False)
+conn = init_db()
 
 # 3. 사이드바: 매물 등록 기능
 with st.sidebar:
@@ -81,43 +75,43 @@ with st.sidebar:
             room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
             bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
         else:
-            request_goal, category, room_count, bath_count = "해당없음", "해당없음", "N/A", "N/A"
+            request_goal, category, room_count, bath_count = "", "", "", ""
 
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
-        address = st.text_input("소재지 (상세 주소 포함) *필수")
+        address = st.text_input("소재지 (상세 주소 포함)")
         area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
         
         submit_button = st.form_submit_button("🏠 데이터베이스에 저장")
 
     if submit_button:
-        if not address.strip():
-            st.error("⚠️ 소재지를 입력해야 저장할 수 있습니다!")
-        else:
-            reg_date_str = datetime.now().strftime("%Y-%m-%d")
-            r_date_str = receipt_date.strftime("%Y-%m-%d")
-            cur = conn.cursor()
-            
-            try:
-                cur.execute('''
-                    INSERT INTO auctions (
-                        reg_date, receipt_date, item_category, item_type, request_goal, 
-                        room_count, bath_count, address, category, price, area, notes
-                    )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ''', (reg_date_str, r_date_str, main_category, item_type, request_goal, 
-                      room_count, bath_count, address, category, price, area, notes))
-                conn.commit()
-                st.success("✅ 성공적으로 저장되었습니다!")
-                st.rerun()
-            except Exception as e:
-                st.error(f"❌ 저장 오류 발생: {e}")
+        # [수정] 소재지 필수 체크 로직 삭제 -> 빈칸이어도 저장 진행
+        reg_date_str = datetime.now().strftime("%Y-%m-%d")
+        r_date_str = receipt_date.strftime("%Y-%m-%d")
+        cur = conn.cursor()
+        
+        try:
+            cur.execute('''
+                INSERT INTO auctions (
+                    reg_date, receipt_date, item_category, item_type, request_goal, 
+                    room_count, bath_count, address, category, price, area, notes
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (reg_date_str, r_date_str, main_category, item_type, request_goal, 
+                  room_count, bath_count, address, category, price, area, notes))
+            conn.commit()
+            st.success("✅ 저장이 완료되었습니다! (빈칸 포함)")
+            st.rerun()
+        except Exception as e:
+            st.error(f"❌ 저장 중 오류 발생: {e}")
 
 # 4. 메인 화면
 st.title("🏠 부동산 경매 매물 관리 시스템")
+
 try:
     df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
     if not df.empty:
+        # 데이터 편집기 (한글 헤더)
         edited_df = st.data_editor(
             df,
             column_config={
@@ -132,9 +126,9 @@ try:
         )
         if st.button("💾 변경사항 적용"):
             edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-            st.success("🔄 업데이트 완료!")
+            st.success("🔄 데이터가 업데이트되었습니다!")
             st.rerun()
     else:
-        st.info("등록된 매물이 없습니다.")
+        st.info("등록된 매물이 없습니다. 왼쪽 사이드바에서 등록해 주세요.")
 except:
-    st.warning("데이터를 불러오는 중입니다...")
+    st.warning("데이터베이스를 준비 중입니다...")
