@@ -29,11 +29,14 @@ st.markdown("""
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
+    # 기존 테이블이 사건번호(case_number)를 가지고 있을 수 있으므로, 
+    # 데이터 구조 일관성을 위해 컬럼명은 유지하되 표시 이름만 '접수일'로 관리하거나, 
+    # 아예 새 컬럼 구조를 생성합니다. (여기서는 직관적으로 접수일로 매핑합니다)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             reg_date TEXT,
-            case_number TEXT,
+            receipt_date TEXT,
             item_type TEXT,
             address TEXT,
             category TEXT,
@@ -48,11 +51,12 @@ def init_db():
 
 conn = init_db()
 
-# 3. 사이드바: 매물 등록 기능 (제목 삭제 및 디자인 수정)
+# 3. 사이드바: 매물 등록 기능 (사건번호 -> 접수일 변경)
 with st.sidebar:
-    # 제목 없이 바로 폼 시작
     with st.form("input_form", clear_on_submit=True):
-        case_number = st.text_input("사건번호", value="2025타경")
+        # 사건번호 대신 접수일 선택창으로 변경
+        receipt_date = st.date_input("접수일", value=datetime.now())
+        
         item_type = st.selectbox("물건종류", ["아파트", "빌라", "오피스텔", "단독주택", "상가", "토지", "기타"])
         
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
@@ -70,13 +74,14 @@ with st.sidebar:
 
     if submit_button:
         reg_date = datetime.now().strftime("%Y-%m-%d")
+        r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO auctions (reg_date, case_number, item_type, address, category, price, rooms, area, notes)
+            INSERT INTO auctions (reg_date, receipt_date, item_type, address, category, price, rooms, area, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reg_date, case_number, item_type, full_address, category, price, rooms, area, notes))
+        ''', (reg_date, r_date_str, item_type, full_address, category, price, rooms, area, notes))
         conn.commit()
-        st.success("저장 완료!")
+        st.success(f"{r_date_str} 접수 매물 저장 완료!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
@@ -91,7 +96,6 @@ search_query = st.text_input("🔍 통합 검색 (예: '2025 구리시' 입력 �
 
 if search_query:
     keywords = search_query.split()
-    # 모든 컬럼을 문자열로 합쳐서 검색
     combined_series = df.astype(str).apply(lambda x: ' '.join(x), axis=1)
     mask = True
     for key in keywords:
@@ -105,7 +109,11 @@ st.write(f"📊 검색 결과: {len(display_df)} 건")
 # 데이터 편집기
 edited_df = st.data_editor(
     display_df,
-    column_config={"id": None},
+    column_config={
+        "id": None,
+        "receipt_date": st.column_config.TextColumn("접수일"), # 표에서도 접수일로 표시
+        "reg_date": st.column_config.TextColumn("등록일")
+    },
     num_rows="dynamic",
     use_container_width=True,
     key="main_editor"
@@ -115,7 +123,6 @@ edited_df = st.data_editor(
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
-        # 편집된 내용을 DB에 덮어쓰기
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
         st.success("반영되었습니다!")
         st.rerun()
