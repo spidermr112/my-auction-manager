@@ -25,11 +25,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 연결 및 테이블 생성
+# 2. 데이터베이스 연결 및 테이블 생성 (방/화장실 컬럼 세분화)
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
-    # 최신 데이터 구조에 맞춰 테이블 생성
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,10 +36,11 @@ def init_db():
             receipt_date TEXT,
             item_category TEXT,
             item_type TEXT,
+            room_count TEXT,
+            bath_count TEXT,
             address TEXT,
             category TEXT,
             price INTEGER,
-            rooms TEXT,
             area TEXT,
             notes TEXT
         )
@@ -54,33 +54,40 @@ conn = init_db()
 with st.sidebar:
     st.subheader("📋 신규 등록")
     
-    # 접수일 선택
+    # 즉각적인 화면 변화를 위해 일부 항목을 Form 바깥에 배치
     receipt_date = st.date_input("접수일", value=datetime.now())
-    
-    # 대분류 선택
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
-    # 대분류에 따른 소분류 리스트 (토지일 때 '토지' 하나만 나오도록 수정)
+    # 대분류에 따른 소분류 설정
     if main_category == "주거용":
         sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
     elif main_category == "비주거용":
         sub_options = ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"]
-    else: # '토지' 선택 시
+    else:
         sub_options = ["토지"]
         
     item_type = st.selectbox("물건 소분류", sub_options)
 
-    # 상세 정보 입력 Form
+    # 상세 정보 입력 Form 시작
     with st.form("remaining_form", clear_on_submit=True):
-        address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
-        address_detail = st.text_input("상세 주소")
-        full_address = f"{address_city} {address_detail}"
         
+        # [핵심 수정] 주거용일 때만 방/화장실 개수 선택창 표시
+        if main_category == "주거용":
+            col1, col2 = st.columns(2)
+            with col1:
+                room_count = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상"])
+            with col2:
+                bath_count = st.selectbox("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"])
+        else:
+            # 주거용이 아니면 데이터베이스에는 'N/A'로 저장
+            room_count = "N/A"
+            bath_count = "N/A"
+
+        # 주소 및 상세 정보
+        address = st.text_input("소재지 (상세 주소 포함)")
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
-        
-        rooms = st.selectbox("방 개수", ["방1", "방2", "방3", "방4 이상", "해당없음"])
-        area = st.text_input("공급/전용 면적")
+        area = st.text_input("공급/전용 면적 (㎡)")
         notes = st.text_area("특약사항 및 분석내용")
         
         submit_button = st.form_submit_button("🏠 DB에 저장하기")
@@ -90,22 +97,22 @@ with st.sidebar:
         r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO auctions (reg_date, receipt_date, item_category, item_type, address, category, price, rooms, area, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reg_date, r_date_str, main_category, item_type, full_address, category, price, rooms, area, notes))
+            INSERT INTO auctions (reg_date, receipt_date, item_category, item_type, room_count, bath_count, address, category, price, area, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (reg_date, r_date_str, main_category, item_type, room_count, bath_count, address, category, price, area, notes))
         conn.commit()
-        st.success(f"저장 완료!")
+        st.success(f"매물이 등록되었습니다!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
-# 데이터 불러오기 (컬럼 명확화)
+# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 통합 검색 기능 (AND 검색 지원)
-search_query = st.text_input("🔍 통합 검색 (예: '토지 남양주' 입력 시 두 단어 모두 포함된 행 검색)")
+# 통합 검색 기능
+search_query = st.text_input("🔍 통합 검색 (예: '방3 남양주' 입력 시 두 조건 동시 검색)")
 
 if search_query:
     keywords = search_query.split()
@@ -119,7 +126,7 @@ else:
 
 st.write(f"📊 검색 결과: {len(display_df)} 건")
 
-# 데이터 편집기 (표 제목 한글화 및 기존 데이터 필드 매핑 해결)
+# 데이터 편집기 (한글 컬럼 설정 및 방/화장실 추가)
 edited_df = st.data_editor(
     display_df,
     column_config={
@@ -128,10 +135,11 @@ edited_df = st.data_editor(
         "receipt_date": st.column_config.TextColumn("접수일"),
         "item_category": st.column_config.TextColumn("대분류"),
         "item_type": st.column_config.TextColumn("물건종류"),
+        "room_count": st.column_config.TextColumn("방수"),
+        "bath_count": st.column_config.TextColumn("화장실수"),
         "address": st.column_config.TextColumn("주소"),
         "category": st.column_config.TextColumn("구분"),
         "price": st.column_config.NumberColumn("가액(만원)"),
-        "rooms": st.column_config.TextColumn("방수"),
         "area": st.column_config.TextColumn("면적"),
         "notes": st.column_config.TextColumn("비고")
     },
@@ -144,9 +152,8 @@ edited_df = st.data_editor(
 col1, col2 = st.columns([1, 4])
 with col1:
     if st.button("💾 변경사항 적용"):
-        # 편집된 내용을 DB에 반영
         edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-        st.success("데이터베이스에 반영되었습니다!")
+        st.success("데이터베이스가 동기화되었습니다!")
         st.rerun()
 
 with col2:
