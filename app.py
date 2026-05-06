@@ -4,62 +4,46 @@ from datetime import datetime
 import os
 import re
 
-# --- 1. 페이지 설정 및 강제 너비 고정 (CSS 최우선 순위 적용) ---
+# --- 1. 페이지 설정 및 레이아웃 박제 (CSS) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 배경 및 컨테이너 여백 */
     .block-container {
         padding: 1.5rem 2rem !important;
         max-width: 100% !important;
     }
 
-    /* [원인 해결] 스트림릿의 컬럼 컨테이너 자체를 Grid로 강제 변환 */
+    /* 좌측 프레임을 750px로 고정 (기존 800에서 50 줄임) */
     [data-testid="stHorizontalBlock"] {
         display: grid !important;
-        grid-template-columns: 800px 1fr !important; /* 좌측 800px, 우측 나머지 */
+        grid-template-columns: 750px 1fr !important; 
         gap: 2rem !important;
-        width: 100% !important;
+        align-items: start !important;
     }
 
-    /* [원인 해결] 개별 컬럼의 Flex 비율을 완전히 끄고 너비 박제 */
     [data-testid="column"]:nth-of-type(1) {
-        width: 800px !important;
-        min-width: 800px !important;
-        max-width: 800px !important;
+        width: 750px !important;
+        min-width: 750px !important;
+        max-width: 750px !important;
         flex: none !important;
     }
 
-    [data-testid="column"]:nth-of-type(2) {
-        width: 100% !important;
-        flex: 1 !important;
-    }
-
-    /* 폼(Form) 테두리와 내부 내용물도 800px에 맞게 꽉 채우기 */
-    [data-testid="stForm"] {
-        width: 100% !important;
-        padding: 2rem !important;
-    }
-
-    /* 라디오 버튼들이 800px 안에서 넉넉하게 가로로 배치되도록 설정 */
+    /* 내부 요소 정렬 고정 */
     div[role="radiogroup"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: wrap !important;
-        gap: 15px !important;
-        justify-content: flex-start !important;
+        gap: 12px !important;
     }
     
     div[role="radiogroup"] label {
-        flex: 0 0 auto !important;
-        margin-right: 10px !important;
         white-space: nowrap !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 (기능은 절대 수정하지 않았습니다) ---
+# --- 2. 데이터 관리 로직 ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -108,20 +92,24 @@ if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
 # --- 3. 화면 배치 ---
-col_reg, col_list = st.columns([1, 1]) # CSS Grid가 제어하므로 설정값은 무시됩니다.
+col_reg, col_list = st.columns([1, 1])
 
 with col_reg:
     st.markdown("### 📍 매물 등록")
+    # [중요] 동적 분류 기능을 위해 대분류를 폼 밖으로 빼거나 키를 부여하여 상태 유지
+    reg_cat = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
+    
+    subs = {
+        "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
+        "비주거용": ["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"],
+        "토지": ["대지", "임야", "농지", "기타"]
+    }
+
     with st.form("reg_form", clear_on_submit=True):
         reg_date = st.date_input("접수일", datetime.now())
-        reg_cat = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
-        
-        subs = {
-            "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
-            "비주거용": ["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"],
-            "토지": ["대지", "임야", "농지", "기타"]
-        }
+        # 대분류에 따라 소분류 리스트가 즉각 변하도록 수정
         reg_sub = st.radio("물건 소분류", subs[reg_cat], horizontal=True)
+        
         reg_purp = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
         reg_trade = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         
