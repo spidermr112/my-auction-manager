@@ -17,9 +17,6 @@ def load_data():
             df = pd.read_csv(DB_FILE)
             if 'receipt_date' in df.columns:
                 df['receipt_date'] = pd.to_datetime(df['receipt_date']).dt.date
-            # 고유 ID 부여 (에러 방지용)
-            if 'id' not in df.columns:
-                df['id'] = [f"P_{int(time.time())}_{i}" for i in range(len(df))]
             return df
         except:
             return create_empty_df()
@@ -39,6 +36,10 @@ def save_data(df):
 # 세션 상태 초기화
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
+
+# [추가] 중복 클릭 방지를 위한 상태값
+if 'last_submit_time' not in st.session_state:
+    st.session_state.last_submit_time = 0
 
 # --- 레이아웃 구성 ---
 col_reg, col_list = st.columns([1, 2.2])
@@ -73,40 +74,48 @@ with col_reg:
         
         reg_price = st.number_input("거래가액(만원)", min_value=0, step=100, key="k_price")
         reg_addr = st.text_input("소재지 상세", key="k_addr")
-        
-        # [핵심] 면적 입력창 (평 단위 자동변환)
-        reg_area_raw = st.text_input("면적 (예: 30평)", key="k_area_raw", help="'평'을 넣어 입력하면 제곱미터로 자동 계산됩니다.")
+        reg_area_raw = st.text_input("면적 (예: 30평)", key="k_area_raw")
         reg_desc = st.text_area("특약내용", key="k_desc")
         
+        # 버튼 클릭 시 처리
         if st.button("🏠 데이터베이스 저장", use_container_width=True, key="k_save_btn"):
-            # --- 평 수 변환 로직 복구 ---
-            final_area = reg_area_raw
-            if reg_area_raw and '평' in reg_area_raw:
-                try:
-                    num_only = re.sub(r'[^0-9.]', '', reg_area_raw)
-                    if num_only:
-                        pyung = float(num_only)
-                        m2 = round(pyung * 3.3058, 2)
-                        final_area = f"{m2}㎡({pyung}평)"
-                except:
-                    pass
+            current_time = time.time()
             
-            # 새 데이터 생성 (주소/면적 빈칸 허용)
-            new_id = f"P_{int(time.time() * 1000)}"
-            new_row = pd.DataFrame([{
-                "id": new_id, "receipt_date": reg_date, "item_category": reg_cat,
-                "item_sub_category": reg_sub, "purpose": reg_purp,
-                "trade_type": reg_trade, "room_count": reg_room,
-                "bathroom_count": reg_bath, "price": reg_price,
-                "address": reg_addr if reg_addr else "(미입력)", 
-                "area": final_area if final_area else "(미입력)", 
-                "description": reg_desc, "status": "진행중"
-            }])
-            
-            st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
-            save_data(st.session_state.data)
-            st.success(f"[{final_area}] 저장 완료!")
-            st.rerun()
+            # [중복 방지 핵심] 마지막 클릭 후 2초 이내의 클릭은 무시
+            if current_time - st.session_state.last_submit_time > 2.0:
+                st.session_state.last_submit_time = current_time
+                
+                # 평 수 변환 로직
+                final_area = reg_area_raw
+                if reg_area_raw and '평' in reg_area_raw:
+                    try:
+                        num_only = re.sub(r'[^0-9.]', '', reg_area_raw)
+                        if num_only:
+                            pyung = float(num_only)
+                            m2 = round(pyung * 3.3058, 2)
+                            final_area = f"{m2}㎡({pyung}평)"
+                    except:
+                        pass
+                
+                new_id = f"P_{int(current_time * 1000)}"
+                new_row = pd.DataFrame([{
+                    "id": new_id, "receipt_date": reg_date, "item_category": reg_cat,
+                    "item_sub_category": reg_sub, "purpose": reg_purp,
+                    "trade_type": reg_trade, "room_count": reg_room,
+                    "bathroom_count": reg_bath, "price": reg_price,
+                    "address": reg_addr if reg_addr else "(미입력)", 
+                    "area": final_area if final_area else "(미입력)", 
+                    "description": reg_desc, "status": "진행중"
+                }])
+                
+                st.session_state.data = pd.concat([st.session_state.data, new_row], ignore_index=True)
+                save_data(st.session_state.data)
+                st.success("저장 완료!")
+                time.sleep(0.5) # 성공 메시지 보여줄 시간
+                st.rerun()
+            else:
+                # 너무 빨리 클릭했을 경우 무시
+                pass
 
 # --- [우측] 매물 목록 및 색인 ---
 with col_list:
@@ -118,7 +127,7 @@ with col_list:
 
     def create_filter(label, options):
         st.markdown(f"**{label}**")
-        cols = st.columns(5) # 한 줄에 5개씩 배치
+        cols = st.columns(5)
         sel = []
         for i, opt in enumerate(options):
             if cols[i % 5].checkbox(opt, key=f"f_{label}_{opt}"):
@@ -129,7 +138,6 @@ with col_list:
     f_sub = create_filter("물건 소분류", all_subs)
     f_purp = create_filter("의뢰목적", ["매도", "임대", "매수", "임차", "교환"])
     
-    # 필터링 적용
     df_f = st.session_state.data.copy()
     if s_query:
         df_f = df_f[df_f.apply(lambda r: s_query in str(r.values), axis=1)]
