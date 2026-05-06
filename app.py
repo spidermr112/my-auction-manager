@@ -8,17 +8,12 @@ st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide"
 
 st.markdown("""
     <style>
-    /* 모든 입력창, 셀렉트박스, 텍스트 영역의 커서를 화살표(default)로 고정 */
     input, div[data-baseweb="select"], textarea, .stNumberInput {
         cursor: default !important;
     }
-    
-    /* 입력창 내부의 실제 텍스트 입력 영역도 화살표로 변경 */
     input::placeholder, textarea::placeholder {
         cursor: default !important;
     }
-
-    /* 사이드바 내부의 입력 필드들에 대해서도 강제 적용 */
     [data-testid="stSidebar"] * {
         cursor: default !important;
     }
@@ -29,14 +24,12 @@ st.markdown("""
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
-    # 기존 테이블이 사건번호(case_number)를 가지고 있을 수 있으므로, 
-    # 데이터 구조 일관성을 위해 컬럼명은 유지하되 표시 이름만 '접수일'로 관리하거나, 
-    # 아예 새 컬럼 구조를 생성합니다. (여기서는 직관적으로 접수일로 매핑합니다)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             reg_date TEXT,
             receipt_date TEXT,
+            item_category TEXT,
             item_type TEXT,
             address TEXT,
             category TEXT,
@@ -51,14 +44,26 @@ def init_db():
 
 conn = init_db()
 
-# 3. 사이드바: 매물 등록 기능 (사건번호 -> 접수일 변경)
+# 3. 사이드바: 매물 등록 기능 (물건종류 그룹화 적용)
 with st.sidebar:
     with st.form("input_form", clear_on_submit=True):
-        # 사건번호 대신 접수일 선택창으로 변경
         receipt_date = st.date_input("접수일", value=datetime.now())
         
-        item_type = st.selectbox("물건종류", ["아파트", "빌라", "오피스텔", "단독주택", "상가", "토지", "기타"])
+        # --- 물건종류 그룹화 로직 ---
+        # 1단계: 큰 분류 선택
+        main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "기타"])
         
+        # 2단계: 대분류에 따른 세부 종류 설정
+        if main_category == "주거용":
+            sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
+        elif main_category == "비주거용":
+            sub_options = ["상가/근린시설", "사무실", "공장/창고", "지식산업센터", "숙박시설"]
+        else:
+            sub_options = ["토지", "임야", "잡종지", "기타"]
+            
+        item_type = st.selectbox("물건 소분류", sub_options)
+        # --------------------------
+
         address_city = st.selectbox("지역(시/군)", ["남양주시", "구리시", "의정부시", "하남시", "서울시", "기타"])
         address_detail = st.text_input("상세 주소")
         full_address = f"{address_city} {address_detail}"
@@ -77,22 +82,20 @@ with st.sidebar:
         r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
         cur.execute('''
-            INSERT INTO auctions (reg_date, receipt_date, item_type, address, category, price, rooms, area, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reg_date, r_date_str, item_type, full_address, category, price, rooms, area, notes))
+            INSERT INTO auctions (reg_date, receipt_date, item_category, item_type, address, category, price, rooms, area, notes)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (reg_date, r_date_str, main_category, item_type, full_address, category, price, rooms, area, notes))
         conn.commit()
-        st.success(f"{r_date_str} 접수 매물 저장 완료!")
+        st.success(f"[{main_category}] {item_type} 저장 완료!")
         st.rerun()
 
 # 4. 메인 화면: 데이터 관리 및 검색
 st.title("🏠 부동산 경매 매물 관리 시스템")
 st.header("📝 실시간 데이터 관리")
 
-# 데이터 불러오기
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 통합 검색 기능 (띄어쓰기 AND 검색 지원)
-search_query = st.text_input("🔍 통합 검색 (예: '2025 구리시' 입력 시 두 단어 모두 포함된 행 검색)")
+search_query = st.text_input("🔍 통합 검색 (예: '주거용 남양주' 입력 시 대분류와 지역 동시 검색)")
 
 if search_query:
     keywords = search_query.split()
@@ -111,7 +114,9 @@ edited_df = st.data_editor(
     display_df,
     column_config={
         "id": None,
-        "receipt_date": st.column_config.TextColumn("접수일"), # 표에서도 접수일로 표시
+        "receipt_date": st.column_config.TextColumn("접수일"),
+        "item_category": st.column_config.TextColumn("대분류"),
+        "item_type": st.column_config.TextColumn("물건종류"),
         "reg_date": st.column_config.TextColumn("등록일")
     },
     num_rows="dynamic",
