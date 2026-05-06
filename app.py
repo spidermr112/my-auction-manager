@@ -7,10 +7,6 @@ from datetime import datetime
 # 1. 페이지 설정 및 엔터 키 제어
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
-# 세션 상태 초기화 (의뢰목적 복수 선택 유지용)
-if 'goals_list' not in st.session_state:
-    st.session_state.goals_list = []
-
 def format_korean_price(price_manwon):
     if price_manwon is None or price_manwon == 0: return "0원"
     eok = price_manwon // 10000
@@ -34,10 +30,11 @@ st.markdown("""
     });
     </script>
     <style>
-    input, div[data-baseweb="select"], textarea, .stNumberInput { cursor: default !important; }
+    input, textarea, .stNumberInput { cursor: default !important; }
     [data-testid="stSidebar"] * { cursor: default !important; }
-    /* 라디오 버튼 간격 조정 */
-    div[data-testid="stWidgetLabel"] { font-weight: bold; margin-bottom: -10px; }
+    /* 체크박스 가로 나열을 위한 스타일 */
+    div[data-testid="stHorizontalBlock"] { margin-bottom: -10px; }
+    .stCheckbox { margin-bottom: -15px; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -65,37 +62,37 @@ with st.sidebar:
     
     receipt_date = st.date_input("접수일", value=datetime.now())
     
-    # [수정] 물건 대분류 라디오 스타일
+    # [대분류] 라디오 버튼
     main_category = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
     
-    # [수정] 물건 소분류도 라디오 버튼 스타일로 변경
+    # [소분류] 라디오 버튼
     sub_map = {
         "주거용": ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"],
         "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
         "토지": ["토지"]
     }
-    
-    # 소분류 선택 (단일 선택이 기본인 라디오 버튼 사용)
     item_type = st.radio("물건 소분류", sub_map[main_category], horizontal=True)
 
-    # [의뢰목적]은 복수 선택이 필요한 경우가 많으므로 기존의 '클릭 즉시 닫힘' 방식 유지
-    goal_options = ["매도", "임대", "매수", "임차", "교환"]
-    selected_goal = st.selectbox("의뢰목적 추가 (클릭 시 입력)", ["선택하세요"] + goal_options)
-    if selected_goal != "선택하세요":
-        if selected_goal not in st.session_state.goals_list:
-            st.session_state.goals_list.append(selected_goal)
-            
-    if st.session_state.goals_list:
-        st.write("선택된 목적: " + " ".join([f"`{g}`" for g in st.session_state.goals_list]))
-        if st.button("목적 초기화"):
-            st.session_state.goals_list = []
-            st.rerun()
-            
-    request_goal = ", ".join(st.session_state.goals_list)
+    # [의뢰목적] 복수 선택이 가능한 가로형 체크박스 스타일
+    st.write("**의뢰목적 (복수 선택 가능)**")
+    goal_cols = st.columns(3)
+    g1 = goal_cols[0].checkbox("매도")
+    g2 = goal_cols[1].checkbox("임대")
+    g3 = goal_cols[2].checkbox("매수")
+    g4 = goal_cols[0].checkbox("임차")
+    g5 = goal_cols[1].checkbox("교환")
+    
+    goals = []
+    if g1: goals.append("매도")
+    if g2: goals.append("임대")
+    if g3: goals.append("매수")
+    if g4: goals.append("임차")
+    if g5: goals.append("교환")
+    request_goal = ", ".join(goals)
 
     # 임대/매매 여부 판단
-    is_lease = any(x in st.session_state.goals_list for x in ["임대", "임차"])
-    is_sale = any(x in st.session_state.goals_list for x in ["매도", "매수", "교환"])
+    is_lease = any(x in goals for x in ["임대", "임차"])
+    is_sale = any(x in goals for x in ["매도", "매수", "교환"])
 
     # 주거용 부가 정보
     if main_category == "주거용":
@@ -120,7 +117,8 @@ with st.sidebar:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
         if price: st.info(f"💰 **거래가액 확인: {format_korean_price(price)}**")
     
-    if not is_lease and not is_sale:
+    # 아무것도 선택 안했을 때 기본창
+    if not goals:
         price = st.number_input("거래가액 (만원)", min_value=0, value=None, step=100)
 
     address = st.text_input("소재지 (상세 주소 포함)")
@@ -154,7 +152,6 @@ with st.sidebar:
                   room_count, bath_count, address, category, price, 
                   deposit, monthly_rent, converted_deposit, final_area, notes))
             conn.commit()
-            st.session_state.goals_list = []
             st.success("✅ 저장이 완료되었습니다!")
             st.rerun()
         except Exception as e:
