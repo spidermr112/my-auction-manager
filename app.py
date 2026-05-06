@@ -5,25 +5,36 @@ import os
 import re
 import time
 
-# --- 1. 페이지 설정 및 레이아웃 강제 고정 (CSS) ---
+# --- 1. 페이지 설정 및 레이아웃 강제 고정 (핵심 수정 사항) ---
 st.set_page_config(page_title="파크부동산 매물관리", layout="wide")
 
+# CSS를 사용하여 브라우저 폭이 좁아져도 컬럼이 아래로 떨어지는 것을 방지
 st.markdown("""
     <style>
-    /* 화면이 좁아져도 컬럼이 아래로 내려가지 않도록 강제 고정 */
-    [data-testid="column"] {
-        flex-direction: column !important;
-        display: flex !important;
-        min-width: 0 !important;
-    }
+    /* 브라우저 크기와 상관없이 좌우 배치를 강제 유지 */
     [data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap !important;
         display: flex !important;
+        flex-wrap: nowrap !important;
+        gap: 1rem !important;
+    }
+    [data-testid="column"] {
+        flex: none !important;
+        width: auto !important;
+    }
+    /* 좌측 입력창 비율 고정 (1) */
+    [data-testid="column"]:nth-child(1) {
+        width: 30% !important;
+        min-width: 320px !important;
+    }
+    /* 우측 목록 비율 고정 (2.2) */
+    [data-testid="column"]:nth-child(2) {
+        width: 70% !important;
+        min-width: 600px !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- 2. 데이터 관리 로직 ---
+# --- 2. 데이터 관리 로직 (기존 유지) ---
 DB_FILE = "property_data.csv"
 
 def load_data():
@@ -49,9 +60,7 @@ def save_data(df):
 
 def parse_flexible_price(price_str):
     if not price_str: return ""
-    # . , - 공백을 /로 변환
     processed = re.sub(r'[\.\-\s]+', '/', price_str.strip())
-    
     if '/' in processed:
         try:
             parts = [p for p in processed.split('/') if p]
@@ -73,7 +82,7 @@ def parse_flexible_price(price_str):
 if 'data' not in st.session_state:
     st.session_state.data = load_data()
 
-# --- 3. 좌우 배치 (비율 고정) ---
+# --- 3. 화면 배치 ---
 col_reg, col_list = st.columns([1, 2.2])
 
 with col_reg:
