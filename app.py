@@ -80,14 +80,17 @@ with st.sidebar:
         reg_date = st.date_input("접수일", datetime.now())
         reg_cat = st.radio("물건 대분류", ["주거용", "비주거용", "토지"], horizontal=True)
         
+        # --- 수정된 부분: 순서 변경 및 라디오 버튼 적용 ---
         if reg_cat == "주거용":
-            subs = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
+            subs = ["빌라/다세대", "단독/다가구", "전원주택", "아파트", "오피스텔(주거)"]
         elif reg_cat == "비주거용":
             subs = ["상가/사무실", "공장/창고", "빌딩/건물", "지식산업센터", "기타"]
         else:
             subs = ["대지", "임야", "농지", "기타"]
             
-        reg_sub = st.selectbox("물건 소분류", subs)
+        reg_sub = st.radio("물건 소분류", subs) # selectbox에서 radio로 변경
+        # ---------------------------------------------
+        
         reg_purp = st.radio("의뢰목적", ["매도", "임대", "매수", "임차", "교환"], horizontal=True)
         reg_trade = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         
