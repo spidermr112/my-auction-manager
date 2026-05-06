@@ -65,7 +65,7 @@ with st.sidebar:
     receipt_date = st.date_input("접수일", value=datetime.now())
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
-    # --- [수정] 물건 소분류 복수 선택 기능 (multiselect) ---
+    # 물건 소분류 복수 선택
     if main_category == "주거용":
         sub_list = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
     elif main_category == "비주거용":
@@ -74,18 +74,20 @@ with st.sidebar:
         sub_list = ["토지"]
     
     selected_sub = st.multiselect("물건 소분류 (복수 선택 가능)", sub_list)
-    item_type = ", ".join(selected_sub) # DB 저장을 위해 문자열로 변환
+    item_type = ", ".join(selected_sub)
 
+    # --- [수정] 의뢰목적 항목에 '교환' 추가 ---
+    goal_options = ["매도", "임대", "매수", "임차", "교환"]
+    
     if main_category == "주거용":
-        goals = st.multiselect("의뢰목적 (복수 선택 가능)", ["매도", "임대", "매수", "임차"])
+        goals = st.multiselect("의뢰목적 (복수 선택 가능)", goal_options)
         request_goal = ", ".join(goals)
         
         category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         room_count = st.radio("방 개수", ["방1", "방2", "방3", "방4 이상"], horizontal=True)
         bath_count = st.radio("화장실 개수", ["화장실1", "화장실2", "화장실3 이상"], horizontal=True)
     else:
-        # 비주거용/토지라도 의뢰목적은 선택할 수 있도록 유지 (필요 없으면 "" 처리)
-        goals = st.multiselect("의뢰목적 (복수 선택 가능)", ["매도", "임대", "매수", "임차"])
+        goals = st.multiselect("의뢰목적 (복수 선택 가능)", goal_options)
         request_goal = ", ".join(goals)
         category, room_count, bath_count = "", "", ""
 
