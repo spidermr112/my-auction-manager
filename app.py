@@ -6,7 +6,7 @@ from datetime import datetime
 # 1. 페이지 설정
 st.set_page_config(page_title="부동산 경매 매물 관리자", layout="wide")
 
-# 마우스 커서 CSS
+# 마우스 커서 디자인 유지
 st.markdown("""
     <style>
     input, div[data-baseweb="select"], textarea, .stNumberInput { cursor: default !important; }
@@ -14,13 +14,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 2. 데이터베이스 연결 및 자동 컬럼 업데이트 로직
+# 2. 데이터베이스 초기화 및 자동 구조 업데이트 (Migration)
 def init_db():
     conn = sqlite3.connect('auction_data.db', check_same_thread=False)
     cur = conn.cursor()
     
-    # [중요] 컬럼이 없을 경우를 대비해 테이블이 있다면 삭제 후 재생성하거나, 
-    # 안전하게 컬럼을 추가하는 방식입니다. 여기서는 깔끔한 재시작을 위해 구조를 정의합니다.
+    # 테이블 생성 (최신 구조: 총 12개 컬럼)
     cur.execute('''
         CREATE TABLE IF NOT EXISTS auctions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,14 +38,17 @@ def init_db():
         )
     ''')
     
-    # 기존 데이터베이스에 새 컬럼(request_goal 등)이 없을 경우 강제로 추가 시도 (Migration)
-    try:
-        cur.execute("ALTER TABLE auctions ADD COLUMN request_goal TEXT")
-        cur.execute("ALTER TABLE auctions ADD COLUMN room_count TEXT")
-        cur.execute("ALTER TABLE auctions ADD COLUMN bath_count TEXT")
-    except:
-        pass # 이미 컬럼이 있으면 에러를 무시하고 넘어감
-        
+    # [에러 방지] 기존 DB에 새 컬럼이 없는 경우를 대비해 컬럼 추가 시도
+    columns = [col[1] for col in cur.execute("PRAGMA table_info(auctions)").fetchall()]
+    new_cols = {
+        "request_goal": "TEXT",
+        "room_count": "TEXT",
+        "bath_count": "TEXT"
+    }
+    for col_name, col_type in new_cols.items():
+        if col_name not in columns:
+            cur.execute(f"ALTER TABLE auctions ADD COLUMN {col_name} {col_type}")
+    
     conn.commit()
     return conn
 
@@ -59,6 +61,7 @@ with st.sidebar:
     receipt_date = st.date_input("접수일", value=datetime.now())
     main_category = st.selectbox("물건 대분류", ["주거용", "비주거용", "토지"])
     
+    # 소분류 설정
     if main_category == "주거용":
         sub_options = ["아파트", "빌라/다세대", "단독/다가구", "오피스텔(주거)", "전원주택"]
     elif main_category == "비주거용":
@@ -68,7 +71,7 @@ with st.sidebar:
         
     item_type = st.selectbox("물건 소분류", sub_options)
 
-    with st.form("remaining_form", clear_on_submit=True):
+    with st.form("input_form", clear_on_submit=True):
         if main_category == "주거용":
             request_goal = st.radio("의뢰목적", ["매수/임차", "매도/임대"], horizontal=True)
             category = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
@@ -77,6 +80,7 @@ with st.sidebar:
         else:
             request_goal, category, room_count, bath_count = "해당없음", "해당없음", "N/A", "N/A"
 
+        # 요청하신 대로 가격을 주소 위로 배치
         price = st.number_input("거래가액 (만원)", min_value=0, step=100)
         address = st.text_input("소재지 (상세 주소 포함)")
         area = st.text_input("공급/전용 면적 (㎡)")
@@ -85,27 +89,29 @@ with st.sidebar:
         submit_button = st.form_submit_button("🏠 데이터베이스에 저장")
 
     if submit_button:
-        reg_date = datetime.now().strftime("%Y-%m-%d")
+        reg_date_str = datetime.now().strftime("%Y-%m-%d")
         r_date_str = receipt_date.strftime("%Y-%m-%d")
         cur = conn.cursor()
-        # 오류가 났던 98번 라인: 컬럼 개수와 VALUES 개수가 정확히 12개로 일치해야 함
+        
+        # INSERT 문에서 컬럼 12개와 VALUES 12개를 정확히 매칭
         cur.execute('''
             INSERT INTO auctions (
                 reg_date, receipt_date, item_category, item_type, request_goal, 
                 room_count, bath_count, address, category, price, area, notes
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (reg_date, r_date_str, main_category, item_type, request_goal, 
+        ''', (reg_date_str, r_date_str, main_category, item_type, request_goal, 
               room_count, bath_count, address, category, price, area, notes))
         conn.commit()
-        st.success("저장 완료!")
+        st.success("성공적으로 저장되었습니다!")
         st.rerun()
 
-# 4. 메인 화면
+# 4. 메인 화면: 데이터 관리
 st.title("🏠 부동산 경매 매물 관리 시스템")
+
 df = pd.read_sql_query("SELECT * FROM auctions ORDER BY id DESC", conn)
 
-# 데이터 편집기 (한글 헤더 매핑)
+# 데이터 편집기
 edited_df = st.data_editor(
     df,
     column_config={
@@ -120,5 +126,5 @@ edited_df = st.data_editor(
 
 if st.button("💾 변경사항 적용"):
     edited_df.to_sql('auctions', conn, if_exists='replace', index=False)
-    st.success("업데이트 완료!")
+    st.success("데이터베이스가 업데이트되었습니다!")
     st.rerun()
