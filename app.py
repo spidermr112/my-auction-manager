@@ -69,11 +69,11 @@ with st.sidebar:
         "비주거용": ["상가/점포", "사무실/오피스", "공장/창고", "지식산업센터", "빌딩/근생건물", "숙박시설"],
         "토지": ["토지"]
     }
-    selected_sub = st.multiselect("물건 소분류 (복수 선택)", sub_map[main_category])
+    selected_sub = st.multiselect("물건 소분류", sub_map[main_category])
     item_type = ", ".join(selected_sub)
 
     goal_options = ["매도", "임대", "매수", "임차", "교환"]
-    goals = st.multiselect("의뢰목적 (복수 선택)", goal_options)
+    goals = st.multiselect("의뢰목적", goal_options)
     request_goal = ", ".join(goals)
 
     is_lease = any(x in goals for x in ["임대", "임차"])
@@ -110,8 +110,8 @@ with st.sidebar:
 
     address = st.text_input("소재지 (상세 주소 포함)")
     
-    # --- [수정] 면적 단위 가독성 개선 ($m^2$ 적용) ---
-    area_raw = st.text_input("면적 입력 (숫자+평 또는 숫자만)", placeholder="예: 30평 / 100")
+    # --- [수정] 입력창 안내 문구 간소화 ---
+    area_raw = st.text_input("면적 (평 또는 ㎡)", placeholder="입력 후 엔터")
     
     final_area = ""
     if area_raw:
@@ -119,15 +119,14 @@ with st.sidebar:
             try:
                 num_part = float(re.findall(r"\d+\.?\d*", area_raw)[0])
                 m2_val = round(num_part * 3.3058, 2)
-                # 가독성을 위해 $m^2$ 기호 사용
                 final_area = f"{m2_val}㎡ ({num_part}평)"
             except:
                 final_area = area_raw
         else:
-            # 숫자만 입력한 경우에도 깔끔하게 단위 추가
+            # 숫자만 쳤을 때는 기본㎡로 인식
             final_area = f"{area_raw}㎡"
         
-        st.info(f"📐 **최종 저장 면적: {final_area}**")
+        st.info(f"📐 **최종 면적: {final_area}**")
             
     notes = st.text_area("특약사항 및 분석내용")
     
