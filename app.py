@@ -1,161 +1,113 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-import re
-import os
 
-# 1. 페이지 설정 (최상단에 위치해야 합니다)
+# 1. 브라우저 설정 및 앱 아이콘/이름 설정
 st.set_page_config(
-    page_title="파크부동산 매니저",
-    page_icon="🏘️",
+    page_title="파크부동산",
+    page_icon="🏠",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# 모바일 앱 느낌을 위한 간단한 CSS 추가
+# 2. 모바일 앱 환경 설정 (홈 화면 추가 시 자동 이름/아이콘 지정)
 st.markdown("""
+    <head>
+        <meta name="apple-mobile-web-app-title" content="파크부동산">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="default">
+        <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/144/home.png">
+        
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="application-name" content="파크부동산">
+        <link rel="icon" sizes="192x192" href="https://img.icons8.com/fluency/192/home.png">
+    </head>
     <style>
-    .main {
-        background-color: #f8f9fa;
-    }
-    .stButton>button {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: bold;
-    }
-    /* 데이터 에디터 폰트 최적화 */
-    [data-testid="stDataEditor"] {
-        font-size: 14px;
-    }
+        /* 폰트 및 UI 깔끔하게 조정 */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap');
+        html, body, [class*="css"] {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        .main {
+            background-color: #f8f9fa;
+        }
+        .stButton>button {
+            width: 100%;
+            border-radius: 10px;
+            height: 3em;
+            background-color: #FF4B4B;
+            color: white;
+            font-weight: bold;
+            border: none;
+        }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🏘️ 파크부동산")
+# 3. 데이터 관리 (세션 스테이트)
+if 'listings' not in st.session_state:
+    st.session_state.listings = pd.DataFrame(columns=[
+        "상태", "의뢰목적", "소분류", "구분", "상세 주소", "면적", "가격(만)"
+    ])
 
-# --- [데이터 저장/불러오기 로직] ---
-DB_FILE = "property_db.csv"
+# --- 헤더 섹션 ---
+col_logo, col_title = st.columns([1, 8])
+with col_logo:
+    st.write("# 🏠")
+with col_title:
+    st.title("파크부동산")
 
-def load_data():
-    cols = ["의뢰목적", "소분류", "구분", "소재지", "면적", "가액", "월세", "대분류", "접수일", "상태"]
-    if os.path.exists(DB_FILE):
-        try:
-            df = pd.read_csv(DB_FILE)
-            for col in cols:
-                if col not in df.columns:
-                    df[col] = 0 if col in ["가액", "월세"] else "-"
-            return df[cols]
-        except:
-            pass
-    return pd.DataFrame(columns=cols)
-
-def save_data(df):
-    df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
-
-if 'df_list' not in st.session_state:
-    st.session_state.df_list = load_data()
-if 'search_query' not in st.session_state: 
-    st.session_state.search_query = ""
-
-def process_area(input_str):
-    if not input_str or input_str.strip() == "": return 0, "-" 
-    nums = re.findall(r"[-+]?\d*\.\d+|\d+", input_str)
-    if not nums: return 0, "-"
-    val = float(nums[0])
-    if "평" in input_str: return int(val), f"{int(val)}평"
-    return int(round(val * 0.3025)), f"{int(round(val * 0.3025))}평"
-
-category_map = {
-    "주거용": ["연립/다세대", "아파트", "단독/다가구", "오피스텔(주거)"],
-    "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
-    "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
-}
-
-# 2. 매물 등록하기
+# --- 매물 등록 섹션 ---
 with st.expander("➕ 매물 등록하기", expanded=False):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        reg_date = st.date_input("접수일", datetime.today())
-        req_purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
-    with col2:
-        sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
-        gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
-        addr = st.text_input("소재지 상세")
-        price = st.number_input("가액/보증금 (만원)", step=0, format="%d")
-        rent = st.number_input("월세 (만원)", step=0, format="%d") if gubun == "월세" else 0
-    with col3:
-        area_text = st.text_input("면적 입력(평 또는 ㎡)", placeholder="")
-        _, py_display = process_area(area_text)
+    with st.form("listing_form"):
+        col1, col2 = st.columns(2)
+        with col1:
+            date = st.date_input("접수일", datetime.now())
+            purpose = st.radio("의뢰목적", ["매도/의뢰", "구함"], horizontal=True)
+            category = st.selectbox("물건대분류", ["주거용", "비주거용"])
+        with col2:
+            manage_num = st.text_input("관리번호", placeholder="면적 입력(평 또는 ㎡)")
+            trade_type = st.radio("거래 구분", ["매매", "전세", "월세"], horizontal=True)
+            address = st.text_input("소재지 상세", placeholder="동/호수까지 입력")
+            
+        price = st.number_input("가격/보증금 (만원)", min_value=0, step=100)
+        memo = st.text_area("특약내용/메모", placeholder="특징, 비빌번호, 채광 등 상세내용 입력")
         
-        guide_text = "특약, 비밀번호, 방, 욕실, 씽크대, 구조, 난방, 전기용량 등 상세 내용을 입력하세요."
-        memo = st.text_area("특약내용", height=150, placeholder=guide_text)
+        submitted = st.form_submit_button("💾 데이터베이스 저장")
+        if submitted:
+            # 임시 데이터 추가 로직
+            new_data = {
+                "상태": "진행중",
+                "의뢰목적": trade_type,
+                "소분류": category,
+                "구분": "매매",
+                "상세 주소": address,
+                "면적": manage_num,
+                "가격(만)": price
+            }
+            st.session_state.listings = pd.concat([st.session_state.listings, pd.DataFrame([new_data])], ignore_index=True)
+            st.success("매물이 성공적으로 저장되었습니다!")
 
-    if st.button("🏠 데이터베이스 저장", use_container_width=True):
-        new_row = pd.DataFrame([{
-            "의뢰목적": req_purpose, "소분류": sub_cat, "구분": gubun, "소재지": addr, 
-            "면적": py_display, "가액": price, "월세": rent, "대분류": main_cat,
-            "접수일": reg_date.strftime("%Y-%m-%d"), "상태": "진행중"
-        }])
-        st.session_state.df_list = pd.concat([st.session_state.df_list, new_row], ignore_index=True)
-        save_data(st.session_state.df_list)
-        st.success("새 매물이 등록되었습니다.")
+st.divider()
 
-st.write("") 
+# --- 검색 및 필터 섹션 ---
+st.subheader("🔍 매물 필터링 / 검색")
+f_col1, f_col2 = st.columns(2)
+with f_col1:
+    status_filter = st.multiselect("상태 선택", ["진행중", "보류", "계약완료"], default=["진행중", "보류"])
+with f_col2:
+    type_filter = st.multiselect("대분류 선택", ["주거용", "비주거용", "토지"], default=["주거용", "비주거용"])
 
-# 3. 매물 필터링 / 검색
-with st.expander("🔍 매물 필터링 / 검색", expanded=True):
-    f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
-    with f_col1:
-        filter_status = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
-    with f_col2:
-        filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
-    with f_col3:
-        search_val = st.text_input("검색어 입력", value=st.session_state.search_query, label_visibility="collapsed")
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("🔍 검색", use_container_width=True):
-                st.session_state.search_query = search_val
-                st.rerun()
-        with c2:
-            if st.button("🔄 초기화", use_container_width=True):
-                st.session_state.search_query = ""
-                st.rerun()
+btn_col1, btn_col2 = st.columns([4, 1])
+with btn_col1:
+    search_query = st.text_input("검색어 입력", placeholder="주소 또는 메모 검색")
+with btn_col2:
+    st.write("##")
+    if st.button("🔄 초기화"):
+        st.rerun()
 
-# --- [필터링 및 검색 로직] ---
-df_display = st.session_state.df_list.copy()
-if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
-if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
-
-if st.session_state.search_query.strip():
-    keywords = st.session_state.search_query.split()
-    for word in keywords:
-        clean_word = re.sub(r'[^가-힣a-zA-Z0-9]', '', word)
-        search_target = df_display.apply(lambda x: re.sub(r'[^가-힣a-zA-Z0-9]', '', " ".join(x.astype(str))), axis=1)
-        df_display = df_display[search_target.str.contains(clean_word, case=False, na=False)]
-
-# 4. 매물 목록 관리
-st.subheader(f"📋 매물 목록 관리 ({len(df_display)}건)")
-edited_df = st.data_editor(
-    df_display, 
-    use_container_width=True, 
-    hide_index=True, 
-    num_rows="dynamic",
-    column_config={
-        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
-        "구분": st.column_config.SelectboxColumn("구분", options=["매매", "전세", "월세"], required=True),
-        "가액": st.column_config.NumberColumn("가액 (만원)", format="%d"),
-        "월세": st.column_config.NumberColumn("월세 (만원)", format="%d"),
-        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
-    },
-    disabled=["대분류", "소분류"]
-)
-
-if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    # 에디터에서 수정된 내용 반영
-    st.session_state.df_list.update(edited_df)
-    save_data(st.session_state.df_list)
-    st.toast("저장되었습니다!", icon="✅")
+# --- 목록 관리 섹션 ---
+st.subheader(f"📋 매물 목록 관리 ({len(st.session_state.listings)}건)")
+st.dataframe(st.session_state.listings, use_container_width=True, hide_index=True)
 
 # 하단 정보
-st.divider()
-st.caption("© 2026 파크부동산 매니저 시스템")
+st.caption("파크부동산 전용 매물관리 시스템 | v1.2 (모바일 앱 최적화)")
