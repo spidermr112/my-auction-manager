@@ -14,14 +14,13 @@ if 'search_query' not in st.session_state: st.session_state.search_query = ""
 if 'df_list' not in st.session_state:
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "대분류", "소분류", "가액", "면적", "상태", "소재지"])
 
-# --- [단위 변환 및 연동 로직] ---
+# --- [유틸리티 함수] ---
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
     nums = re.findall(r"[-+]?\d*\.\d+|\d+", input_str)
     if not nums: return 0, "-"
     val = float(nums[0])
-    if "평" in input_str:
-        return int(val), f"{int(val)}평"
+    if "평" in input_str: return int(val), f"{int(val)}평"
     return int(round(val * 0.3025)), f"{int(round(val * 0.3025))}평"
 
 def calc_values():
@@ -38,7 +37,7 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-# 2. 매물 등록하기 섹션 (수정 완료)
+# 2. 매물 등록하기 (이전과 동일)
 with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -69,9 +68,9 @@ with st.expander("➕ 매물 등록하기", expanded=False):
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         st.success("데이터가 추가되었습니다!")
 
-st.write("") # 가로선 대신 여백
+st.write("")
 
-# 3. 매물 필터링 섹션
+# 3. 매물 필터링 (이전과 동일)
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1:
@@ -79,7 +78,6 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        # 검색어 입력과 버튼을 한 줄에 배치
         s_col1, s_col2 = st.columns([3, 1])
         with s_col1:
             search_input = st.text_input("소재지 검색", placeholder="동네 이름이나 주소", label_visibility="collapsed")
@@ -87,30 +85,54 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# 데이터 필터링 실행
-df = st.session_state.df_list
+# 필터링 로직
+df_filtered = st.session_state.df_list.copy()
 if filter_status:
-    df = df[df['상태'].isin(filter_status)]
+    df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
 if filter_cat:
-    df = df[df['대분류'].isin(filter_cat)]
+    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
 if st.session_state.search_query:
-    df = df[df['소재지'].str.contains(st.session_state.search_query, na=False)]
+    df_filtered = df_filtered[df_filtered['소재지'].str.contains(st.session_state.search_query, na=False)]
 
-# 4. 매물 목록 현황
-st.subheader(f"📋 매물 목록 (검색 결과: {len(df)}건)")
-if not df.empty:
-    edited_df = st.data_editor(
-        df,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
-            "가액": st.column_config.NumberColumn("가액(만원)", format="%d 만원"),
-        },
-        disabled=["접수일", "대분류", "소분류"] 
-    )
-    if st.button("💾 변경 사항 저장"):
-        st.session_state.df_list.update(edited_df)
-        st.toast("변경사항이 반영되었습니다!")
-else:
-    st.info("조건에 맞는 매물이 없습니다.")
+# --- [여기부터 매물 목록 수정 부분] ---
+st.subheader(f"📋 매물 목록 관리 (조회: {len(df_filtered)}건)")
+
+# 데이터 편집기 설정
+edited_df = st.data_editor(
+    df_filtered,
+    use_container_width=True,
+    hide_index=True,
+    num_rows="dynamic", # 행 추가/삭제 가능 모드
+    column_config={
+        "접수일": st.column_config.TextColumn("📅 접수일", width="small"),
+        "대분류": st.column_config.TextColumn("📁 분류", width="small"),
+        "소분류": st.column_config.TextColumn("📄 세부", width="small"),
+        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+        "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d", width="medium"),
+        "면적": st.column_config.TextColumn("📏 면적", width="small"),
+        "상태": st.column_config.SelectboxColumn(
+            "⚙️ 상태", 
+            options=["진행중", "완료", "보류", "삭제"],
+            required=True,
+            width="small"
+        ),
+    },
+    # 접수일과 분류는 실수 방지를 위해 수정 불가 처리, 나머지는 수정 가능
+    disabled=["접수일", "대분류", "소분류"] 
+)
+
+# 변경 사항 반영 버튼
+c1, c2, _ = st.columns([1, 1, 2])
+with c1:
+    if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+        # 편집된 데이터를 원본 세션에 반영
+        # 필터링된 상태에서 행이 삭제되거나 수정된 것을 원본에 동기화
+        st.session_state.df_list = edited_df
+        st.toast("목록이 성공적으로 업데이트되었습니다!")
+with c2:
+    # 엑셀 다운로드 기능 추가 (보너스)
+    csv = df_filtered.to_csv(index=False).encode('utf-8-sig')
+    st.download_button("📥 목록 다운로드 (CSV)", data=csv, file_name="park_land_list.csv", use_container_width=True)
+
+if df_filtered.empty:
+    st.info("조건에 맞는 매물이 없습니다. 필터를 조정하거나 새 매물을 등록해 주세요.")
