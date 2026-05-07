@@ -13,12 +13,12 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-# 세션 상태 초기화
+# 세션 상태 초기화 (빈 칸 유지를 위해 None 사용)
 if 'land_price' not in st.session_state: st.session_state.land_price = None
 if 'py_price' not in st.session_state: st.session_state.py_price = None
 if 'land_area' not in st.session_state: st.session_state.land_area = None
 
-# --- [연동 계산 함수] ---
+# --- [연동 계산 함수 (정수형)] ---
 def update_by_total():
     if st.session_state.land_area and st.session_state.land_area > 0 and st.session_state.land_price:
         st.session_state.py_price = int(st.session_state.land_price / st.session_state.land_area)
@@ -40,16 +40,22 @@ with st.expander("➕ 새 매물 등록하기 (클릭하여 입력창 열기)", 
     
     with col1:
         st.date_input("접수일", datetime.today())
+        # 대분류 선택 (기본값 토지)
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=2)
         st.radio("의뢰목적", ["매도", "임대", "매수", "임차"], horizontal=True)
     
     with col2:
         st.selectbox("물건 소분류", category_map[main_cat])
-        st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
+        
+        # --- [수정 포인트] 대분류가 토지일 때만 '복수토지' 라디오 버튼 추가 ---
+        if main_cat == "토지":
+            st.radio("구분", ["매매", "전세", "월세", "복수토지"], horizontal=True)
+        else:
+            st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         
         if main_cat == "토지":
             st.text_input("소재지 상세", placeholder="예: 경기도 남양주시 화도읍...")
-            # [수정] step=0을 설정하여 + / - 버튼 제거 (직접 입력 전용)
+            # 플러스/마이너스 버튼 제거(step=0), 빈 칸 시작(value=None)
             st.number_input("평단가 (만원)", key="py_price", value=st.session_state.py_price, step=0, format="%d", on_change=update_by_py_price)
             st.number_input("거래가액 (만원)", key="land_price", value=st.session_state.land_price, step=0, format="%d", on_change=update_by_total)
         else:
@@ -57,7 +63,7 @@ with st.expander("➕ 새 매물 등록하기 (클릭하여 입력창 열기)", 
         
     with col3:
         if main_cat == "토지":
-            # [수정] 면적 입력창에서도 버튼 제거
+            # 면적 입력창 버튼 제거 및 빈 칸 유지
             st.number_input("면적 (평)", key="land_area", value=st.session_state.land_area, step=0, format="%d", on_change=update_by_area, placeholder="면적을 입력하세요")
         else:
             st.text_input("소재지 상세")
@@ -71,7 +77,7 @@ with st.expander("➕ 새 매물 등록하기 (클릭하여 입력창 열기)", 
 
 st.divider()
 
-# 3. 매물 목록 현황
+# 3. 매물 관리 목록 현황 (시각화 전용)
 st.subheader("🔍 매물 관리 목록")
 example_df = pd.DataFrame({
     "접수일": [datetime.today().strftime("%Y-%m-%d")],
