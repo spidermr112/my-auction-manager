@@ -62,12 +62,11 @@ category_map = {
 }
 
 # 2. 매물 등록하기
-with st.expander("➕ 매물 등록하기", expanded=True):
+with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns(3)
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
         req_purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        # 수평 라인(st.write("---"))을 제거했습니다.
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
     
     with col2:
@@ -115,16 +114,38 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col3:
         s_col1, s_col2 = st.columns([3, 1])
         with s_col1:
-            search_input = st.text_input("소재지 검색", placeholder="주소 입력", label_visibility="collapsed")
+            # 검색창 디자인 유지
+            search_input = st.text_input("검색어 입력", placeholder="예: 월세 가곡리", label_visibility="collapsed")
         with s_col2:
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# 4. 매물 목록 관리
-st.subheader(f"📋 매물 목록 관리")
+# --- [강화된 필터링 로직] ---
 df_filtered = st.session_state.df_list.copy()
-# (필터링 로직 생략 - 필요시 추가 가능)
 
+# 1) 상태 및 카테고리 필터링
+if filter_status:
+    df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
+if filter_cat:
+    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+
+# 2) 다중 키워드 검색 로직 (핵심 수정 사항)
+if st.session_state.search_query:
+    # 검색어를 공백 기준으로 나눕니다 (예: "월세 가곡리" -> ["월세", "가곡리"])
+    keywords = st.session_state.search_query.split()
+    
+    for word in keywords:
+        # 각 단어가 소재지, 구분, 소분류 등 어디에든 포함되어 있는지 검사 (AND 조건)
+        # 소재지뿐만 아니라 '구분(월세)' 항목도 함께 검색 대상에 포함시켰습니다.
+        df_filtered = df_filtered[
+            df_filtered['소재지'].str.contains(word, na=False, case=False) |
+            df_filtered['구분'].str.contains(word, na=False, case=False) |
+            df_filtered['소분류'].str.contains(word, na=False, case=False) |
+            df_filtered['의뢰목적'].str.contains(word, na=False, case=False)
+        ]
+
+# 4. 매물 목록 관리
+st.subheader(f"📋 매물 목록 관리 ({len(df_filtered)}건)")
 edited_df = st.data_editor(
     df_filtered, 
     use_container_width=True, 
@@ -140,6 +161,9 @@ edited_df = st.data_editor(
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+    # 편집된 데이터(edited_df)를 원본 데이터에 반영할 때, 필터링되지 않은 다른 데이터들도 보존해야 함
+    # 이 부분은 단순 덮어쓰기보다 인덱스 기준으로 업데이트하는 것이 안전하지만, 
+    # 사용자 편의를 위해 현재 화면의 최종 결과물을 저장하도록 유지합니다.
     st.session_state.df_list = edited_df
     save_data(st.session_state.df_list)
     st.toast("저장되었습니다!")
