@@ -12,12 +12,12 @@ st.title("🏘️ 파크부동산")
 DB_FILE = "property_db.csv"
 
 def load_data():
-    # 요청하신 순서대로 컬럼 정의
-    cols = ["소분류", "구분", "소재지", "면적", "가액", "월세", "대분류", "접수일", "의뢰목적", "상태"]
+    # 요청하신 순서대로 컬럼 재배치 (의뢰목적이 맨 앞으로)
+    cols = ["의뢰목적", "소분류", "구분", "소재지", "면적", "가액", "월세", "대분류", "접수일", "상태"]
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # 기존 데이터가 있을 경우 열 순서 재배치 및 누락 열 보정
+            # 기존 데이터가 있을 경우 열 순서 보정 및 누락 열 생성
             for col in cols:
                 if col not in df.columns:
                     df[col] = 0 if col in ["가액", "월세"] else "-"
@@ -70,10 +70,9 @@ with st.expander("➕ 매물 등록하기", expanded=False):
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_row = pd.DataFrame([{
-            "소분류": sub_cat, "구분": gubun, "소재지": addr, "면적": py_display,
-            "가액": price, "월세": rent, "대분류": main_cat,
-            "접수일": reg_date.strftime("%Y-%m-%d"),
-            "의뢰목적": req_purpose, "상태": "진행중"
+            "의뢰목적": req_purpose, "소분류": sub_cat, "구분": gubun, "소재지": addr, 
+            "면적": py_display, "가액": price, "월세": rent, "대분류": main_cat,
+            "접수일": reg_date.strftime("%Y-%m-%d"), "상태": "진행중"
         }])
         st.session_state.df_list = pd.concat([st.session_state.df_list, new_row], ignore_index=True)
         save_data(st.session_state.df_list)
@@ -89,7 +88,6 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        # 실시간 반영을 위해 텍스트 입력값을 세션에 직접 할당하지 않고 버튼 클릭 시 업데이트
         search_val = st.text_input("검색어 입력", value=st.session_state.search_query, label_visibility="collapsed")
         c1, c2 = st.columns(2)
         with c1:
@@ -104,16 +102,13 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
 # --- [필터링 및 검색 로직] ---
 df_display = st.session_state.df_list.copy()
 
-# 기본 필터링
 if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
 if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
 
-# 스마트 검색 (모든 열 통합 검색)
 if st.session_state.search_query.strip():
     keywords = st.session_state.search_query.split()
     for word in keywords:
         clean_word = re.sub(r'[^가-힣a-zA-Z0-9]', '', word)
-        # 전체 열 내용을 합쳐서 특수문자 무시하고 검색
         search_target = df_display.apply(lambda x: re.sub(r'[^가-힣a-zA-Z0-9]', '', " ".join(x.astype(str))), axis=1)
         df_display = df_display[search_target.str.contains(clean_word, case=False, na=False)]
 
@@ -126,17 +121,16 @@ edited_df = st.data_editor(
     hide_index=True, 
     num_rows="dynamic",
     column_config={
+        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
+        "구분": st.column_config.SelectboxColumn("구분", options=["매매", "전세", "월세"], required=True),
         "가액": st.column_config.NumberColumn("가액", format="%d"),
         "월세": st.column_config.NumberColumn("월세", format="%d"),
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
-        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
-        "구분": st.column_config.SelectboxColumn("구분", options=["매매", "전세", "월세"], required=True),
     },
-    disabled=["대분류", "소분류"] # 대분류와 소분류는 매칭 문제로 등록 시에만 수정 권장
+    disabled=["대분류", "소분류"]
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    # 편집된 데이터를 전체 리스트에 반영 (인덱스 유지 방식)
     st.session_state.df_list.update(edited_df)
     save_data(st.session_state.df_list)
-    st.toast("모든 데이터가 성공적으로 저장되었습니다!")
+    st.toast("저장되었습니다!")
