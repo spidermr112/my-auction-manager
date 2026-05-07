@@ -14,10 +14,14 @@ DB_FILE = "property_db.csv"
 def load_data():
     if os.path.exists(DB_FILE):
         try:
-            return pd.read_csv(DB_FILE)
+            df = pd.read_csv(DB_FILE)
+            # '월세' 열이 없으면 새로 생성 (기존 데이터 호환용)
+            if "월세" not in df.columns:
+                df["월세"] = 0
+            return df
         except:
-            return pd.DataFrame(columns=["접수일", "대분류", "소분류", "구분", "가액", "면적", "상태", "소재지"])
-    return pd.DataFrame(columns=["접수일", "대분류", "소분류", "구분", "가액", "면적", "상태", "소재지"])
+            pass
+    return pd.DataFrame(columns=["접수일", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"])
 
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
@@ -26,6 +30,7 @@ def save_data(df):
 if 'df_list' not in st.session_state:
     st.session_state.df_list = load_data()
 if 'land_price' not in st.session_state: st.session_state.land_price = 0
+if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0 # 월세 세션 추가
 if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = ""
 
@@ -43,13 +48,12 @@ def calc_values():
     py_num, _ = process_area(area_text)
     curr_py = st.session_state.get('py_price', 0)
     curr_land = st.session_state.get('land_price', 0)
-    
     if py_num > 0 and curr_py > 0:
         st.session_state.land_price = int(curr_py * py_num)
     elif py_num > 0 and curr_land > 0 and curr_py == 0:
         st.session_state.py_price = int(curr_land / py_num)
 
-# --- [카테고리 설정: 주거용 순서 변경 반영] ---
+# --- [카테고리 설정] ---
 category_map = {
     "주거용": ["연립/다세대", "아파트", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
@@ -57,23 +61,24 @@ category_map = {
 }
 
 # 2. 매물 등록하기
-with st.expander("➕ 매물 등록하기", expanded=False):
+with st.expander("➕ 매물 등록하기", expanded=True):
     col1, col2, col3 = st.columns(3)
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
-        # 기본 선택을 '주거용'으로 설정 (index=0)
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
     with col2:
-        # 주거용 선택 시 '연립/다세대'가 리스트의 첫 번째이므로 자동으로 디폴트가 됩니다.
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # '매매'일 때 평단가 3단 로직 활성화
+        # --- [월세 분리 로직] ---
         if gubun == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
-        else:
+        elif gubun == "월세":
+            st.number_input("보증금 (만원)", key="land_price", step=0, format="%d")
+            st.number_input("월세 (만원)", key="monthly_rent", step=0, format="%d")
+        else: # 전세
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d")
             
     with col3:
@@ -85,13 +90,10 @@ with st.expander("➕ 매물 등록하기", expanded=False):
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
-            "대분류": main_cat, 
-            "소분류": sub_cat, 
-            "구분": gubun,
+            "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
             "가액": st.session_state.get('land_price', 0), 
-            "면적": py_display, 
-            "상태": "진행중", 
-            "소재지": addr
+            "월세": st.session_state.get('monthly_rent', 0) if gubun == "월세" else 0, # 월세 저장
+            "면적": py_display, "상태": "진행중", "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         save_data(st.session_state.df_list)
@@ -114,7 +116,7 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# 필터링 적용 로직
+# 필터링 적용
 df_filtered = st.session_state.df_list.copy()
 if filter_status: df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
 if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
@@ -129,7 +131,9 @@ edited_df = st.data_editor(
     hide_index=True, 
     num_rows="dynamic",
     column_config={
-        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True)
+        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
+        "가액": st.column_config.NumberColumn("가액/보증금", format="%d"),
+        "월세": st.column_config.NumberColumn("월세", format="%d"),
     },
     disabled=["접수일", "대분류", "소분류"]
 )
