@@ -4,8 +4,32 @@ from datetime import datetime
 import re
 import os
 
-# 1. 페이지 설정
-st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
+# 1. 페이지 설정 (최상단에 위치해야 합니다)
+st.set_page_config(
+    page_title="파크부동산 매니저",
+    page_icon="🏘️",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# 모바일 앱 느낌을 위한 간단한 CSS 추가
+st.markdown("""
+    <style>
+    .main {
+        background-color: #f8f9fa;
+    }
+    .stButton>button {
+        width: 100%;
+        border-radius: 8px;
+        font-weight: bold;
+    }
+    /* 데이터 에디터 폰트 최적화 */
+    [data-testid="stDataEditor"] {
+        font-size: 14px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 st.title("🏘️ 파크부동산")
 
 # --- [데이터 저장/불러오기 로직] ---
@@ -63,7 +87,6 @@ with st.expander("➕ 매물 등록하기", expanded=False):
         area_text = st.text_input("면적 입력(평 또는 ㎡)", placeholder="")
         _, py_display = process_area(area_text)
         
-        # --- [특약내용 가이드 문구 추가] ---
         guide_text = "특약, 비밀번호, 방, 욕실, 씽크대, 구조, 난방, 전기용량 등 상세 내용을 입력하세요."
         memo = st.text_area("특약내용", height=150, placeholder=guide_text)
 
@@ -120,14 +143,19 @@ edited_df = st.data_editor(
     column_config={
         "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
         "구분": st.column_config.SelectboxColumn("구분", options=["매매", "전세", "월세"], required=True),
-        "가액": st.column_config.NumberColumn("가액", format="%d"),
-        "월세": st.column_config.NumberColumn("월세", format="%d"),
+        "가액": st.column_config.NumberColumn("가액 (만원)", format="%d"),
+        "월세": st.column_config.NumberColumn("월세 (만원)", format="%d"),
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
     },
     disabled=["대분류", "소분류"]
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+    # 에디터에서 수정된 내용 반영
     st.session_state.df_list.update(edited_df)
     save_data(st.session_state.df_list)
-    st.toast("저장되었습니다!")
+    st.toast("저장되었습니다!", icon="✅")
+
+# 하단 정보
+st.divider()
+st.caption("© 2026 파크부동산 매니저 시스템")
