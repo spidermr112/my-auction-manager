@@ -12,17 +12,19 @@ st.title("🏘️ 파크부동산")
 DB_FILE = "property_db.csv"
 
 def load_data():
+    # 요청하신 순서대로 컬럼 정의
+    cols = ["소분류", "구분", "소재지", "면적", "가액", "월세", "대분류", "접수일", "의뢰목적", "상태"]
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            cols = ["접수일", "의뢰목적", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"]
+            # 기존 데이터가 있을 경우 열 순서 재배치 및 누락 열 보정
             for col in cols:
                 if col not in df.columns:
                     df[col] = 0 if col in ["가액", "월세"] else "-"
             return df[cols]
         except:
             pass
-    return pd.DataFrame(columns=["접수일", "의뢰목적", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"])
+    return pd.DataFrame(columns=cols)
 
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
@@ -30,7 +32,8 @@ def save_data(df):
 # --- [세션 상태 초기화] ---
 if 'df_list' not in st.session_state:
     st.session_state.df_list = load_data()
-if 'search_query' not in st.session_state: st.session_state.search_query = ""
+if 'search_query' not in st.session_state: 
+    st.session_state.search_query = ""
 
 # --- [유틸리티 함수] ---
 def process_area(input_str):
@@ -58,24 +61,23 @@ with st.expander("➕ 매물 등록하기", expanded=False):
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세")
-        
-        # 금액 입력 세션 직접 관리 대신 일반 변수 사용
         price = st.number_input("가액/보증금 (만원)", step=0, format="%d")
         rent = st.number_input("월세 (만원)", step=0, format="%d") if gubun == "월세" else 0
     with col3:
-        area_text = st.text_input("면적 입력", placeholder="")
+        area_text = st.text_input("면적 입력(평 또는 ㎡)", placeholder="")
         _, py_display = process_area(area_text)
-        st.text_area("특약내용", height=150, key="memo_input")
+        memo = st.text_area("특약내용", height=150)
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
-        new_data = {
+        new_row = pd.DataFrame([{
+            "소분류": sub_cat, "구분": gubun, "소재지": addr, "면적": py_display,
+            "가액": price, "월세": rent, "대분류": main_cat,
             "접수일": reg_date.strftime("%Y-%m-%d"),
-            "의뢰목적": req_purpose, "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
-            "가액": price, "월세": rent, "면적": py_display, "상태": "진행중", "소재지": addr
-        }
-        st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
+            "의뢰목적": req_purpose, "상태": "진행중"
+        }])
+        st.session_state.df_list = pd.concat([st.session_state.df_list, new_row], ignore_index=True)
         save_data(st.session_state.df_list)
-        st.success("저장 완료!")
+        st.success("새 매물이 등록되었습니다.")
 
 st.write("") 
 
@@ -87,58 +89,54 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        # 검색어 처리를 위한 텍스트 입력창
-        search_val = st.text_input("검색어 입력", value=st.session_state.search_query, placeholder="", label_visibility="collapsed")
+        # 실시간 반영을 위해 텍스트 입력값을 세션에 직접 할당하지 않고 버튼 클릭 시 업데이트
+        search_val = st.text_input("검색어 입력", value=st.session_state.search_query, label_visibility="collapsed")
         c1, c2 = st.columns(2)
         with c1:
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_val
-                st.rerun() # 즉시 화면 갱신
+                st.rerun()
         with c2:
             if st.button("🔄 초기화", use_container_width=True):
                 st.session_state.search_query = ""
                 st.rerun()
 
-# --- [검색 알고리즘 강화] ---
-df_final = st.session_state.df_list.copy()
+# --- [필터링 및 검색 로직] ---
+df_display = st.session_state.df_list.copy()
 
-# 1. 상태/카테고리 필터
-if filter_status: df_final = df_final[df_final['상태'].isin(filter_status)]
-if filter_cat: df_final = df_final[df_final['대분류'].isin(filter_cat)]
+# 기본 필터링
+if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
+if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
 
-# 2. 키워드 검색 (공백 기준 다중 AND 조건 + 특수문자 제거)
+# 스마트 검색 (모든 열 통합 검색)
 if st.session_state.search_query.strip():
     keywords = st.session_state.search_query.split()
     for word in keywords:
         clean_word = re.sub(r'[^가-힣a-zA-Z0-9]', '', word)
-        # 모든 텍스트 열에서 특수문자를 제거하고 통합 검색
-        search_target = df_final.apply(lambda x: re.sub(r'[^가-힣a-zA-Z0-9]', '', " ".join(x.astype(str))), axis=1)
-        df_final = df_final[search_target.str.contains(clean_word, case=False, na=False)]
+        # 전체 열 내용을 합쳐서 특수문자 무시하고 검색
+        search_target = df_display.apply(lambda x: re.sub(r'[^가-힣a-zA-Z0-9]', '', " ".join(x.astype(str))), axis=1)
+        df_display = df_display[search_target.str.contains(clean_word, case=False, na=False)]
 
 # 4. 매물 목록 관리
-st.subheader(f"📋 매물 목록 관리 ({len(df_final)}건)")
+st.subheader(f"📋 매물 목록 관리 ({len(df_display)}건)")
 
-# 데이터 에디터에서 인덱스 유지를 위해 별도 처리
 edited_df = st.data_editor(
-    df_final, 
+    df_display, 
     use_container_width=True, 
     hide_index=True, 
     num_rows="dynamic",
     column_config={
+        "가액": st.column_config.NumberColumn("가액", format="%d"),
+        "월세": st.column_config.NumberColumn("월세", format="%d"),
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
+        "구분": st.column_config.SelectboxColumn("구분", options=["매매", "전세", "월세"], required=True),
     },
-    disabled=["접수일", "대분류", "소분류"]
+    disabled=["대분류", "소분류"] # 대분류와 소분류는 매칭 문제로 등록 시에만 수정 권장
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    # 검색된 결과에서 수정한 내용을 원본 리스트에 정확히 반영 (인덱스 매칭)
-    # 1. 원본 데이터프레임 복사
-    new_master_df = st.session_state.df_list.copy()
-    # 2. 현재 화면에 보이는 데이터(수정본)의 인덱스를 기준으로 원본 업데이트
-    # (data_editor는 인덱스를 유지하므로 유효함)
-    new_master_df.update(edited_df)
-    
-    st.session_state.df_list = new_master_df
+    # 편집된 데이터를 전체 리스트에 반영 (인덱스 유지 방식)
+    st.session_state.df_list.update(edited_df)
     save_data(st.session_state.df_list)
-    st.toast("전체 데이터베이스에 안전하게 저장되었습니다!")
+    st.toast("모든 데이터가 성공적으로 저장되었습니다!")
