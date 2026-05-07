@@ -63,7 +63,6 @@ with st.expander("➕ 매물 등록하기", expanded=False):
         area_text = st.text_input("면적 입력(평 또는 ㎡)", placeholder="")
         _, py_display = process_area(area_text)
         
-        # --- [특약내용 가이드 문구 추가] ---
         guide_text = "특약, 비밀번호, 방, 욕실, 씽크대, 구조, 난방, 전기용량 등 상세 내용을 입력하세요."
         memo = st.text_area("특약내용", height=150, placeholder=guide_text)
 
@@ -73,9 +72,12 @@ with st.expander("➕ 매물 등록하기", expanded=False):
             "면적": py_display, "가액": price, "월세": rent, "대분류": main_cat,
             "접수일": reg_date.strftime("%Y-%m-%d"), "상태": "진행중"
         }])
-        st.session_state.df_list = pd.concat([st.session_state.df_list, new_row], ignore_index=True)
+        
+        # --- [수정 포인트: 신규 데이터를 가장 앞에(위로) 배치] ---
+        st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
         save_data(st.session_state.df_list)
-        st.success("새 매물이 등록되었습니다.")
+        st.success("새 매물이 등록되었습니다. (목록 상단에 추가됨)")
+        st.rerun() # 화면을 즉시 갱신하여 상단에 뜨게 함
 
 st.write("") 
 
@@ -128,6 +130,7 @@ edited_df = st.data_editor(
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+    # 상단에 추가된 상태에서도 업데이트가 정확히 이루어지도록 함
     st.session_state.df_list.update(edited_df)
     save_data(st.session_state.df_list)
     st.toast("저장되었습니다!")
