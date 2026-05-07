@@ -1,4 +1,4 @@
-import streamlit as st  # <-- 이 줄이 반드시 맨 위에 있어야 합니다!
+import streamlit as st
 import pandas as pd
 from datetime import datetime
 import re
@@ -49,24 +49,27 @@ def calc_values():
     elif py_num > 0 and curr_land > 0 and curr_py == 0:
         st.session_state.py_price = int(curr_land / py_num)
 
+# --- [카테고리 설정: 주거용 순서 변경 반영] ---
 category_map = {
-    "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
+    "주거용": ["연립/다세대", "아파트", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-# 2. 매물 등록하기 (매매 시 3단 연동 로직 적용)
+# 2. 매물 등록하기
 with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns(3)
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
-        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=2)
+        # 기본 선택을 '주거용'으로 설정 (index=0)
+        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
     with col2:
+        # 주거용 선택 시 '연립/다세대'가 리스트의 첫 번째이므로 자동으로 디폴트가 됩니다.
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # 주거/비주거/토지 상관없이 '매매'일 때 평단가 메뉴 노출
+        # '매매'일 때 평단가 3단 로직 활성화
         if gubun == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
@@ -82,17 +85,21 @@ with st.expander("➕ 매물 등록하기", expanded=False):
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
-            "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
+            "대분류": main_cat, 
+            "소분류": sub_cat, 
+            "구분": gubun,
             "가액": st.session_state.get('land_price', 0), 
-            "면적": py_display, "상태": "진행중", "소재지": addr
+            "면적": py_display, 
+            "상태": "진행중", 
+            "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         save_data(st.session_state.df_list)
-        st.success("저장 완료!")
+        st.success("매물이 저장되었습니다!")
 
 st.write("") 
 
-# 3. 매물 필터링
+# 3. 매물 필터링 / 검색
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1:
@@ -107,7 +114,7 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# 필터링 적용
+# 필터링 적용 로직
 df_filtered = st.session_state.df_list.copy()
 if filter_status: df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
 if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
@@ -117,12 +124,17 @@ if st.session_state.search_query:
 # 4. 매물 목록 관리
 st.subheader(f"📋 매물 목록 관리 ({len(df_filtered)}건)")
 edited_df = st.data_editor(
-    df_filtered, use_container_width=True, hide_index=True, num_rows="dynamic",
-    column_config={"상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True)},
+    df_filtered, 
+    use_container_width=True, 
+    hide_index=True, 
+    num_rows="dynamic",
+    column_config={
+        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True)
+    },
     disabled=["접수일", "대분류", "소분류"]
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
     st.session_state.df_list = edited_df
     save_data(st.session_state.df_list)
-    st.toast("저장되었습니다!")
+    st.toast("변경사항이 영구 저장되었습니다!")
