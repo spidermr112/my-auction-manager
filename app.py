@@ -5,7 +5,7 @@ import re
 
 # 1. 페이지 설정
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
-st.title("🏘️ 파크부동산") # 타이틀 수정: 파크부동산
+st.title("🏘️ 파크부동산")
 
 # --- [세션 상태 초기화] ---
 if 'land_price' not in st.session_state: st.session_state.land_price = 0
@@ -38,8 +38,8 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-# 2. 새 매물 등록 섹션
-with st.expander("➕ 새 매물 등록하기", expanded=False):
+# 2. 매물 등록하기 섹션 (수정 완료)
+with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns(3)
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
@@ -69,7 +69,7 @@ with st.expander("➕ 새 매물 등록하기", expanded=False):
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         st.success("데이터가 추가되었습니다!")
 
-st.write("") # 가로선 제거 후 여백
+st.write("") # 가로선 대신 여백
 
 # 3. 매물 필터링 섹션
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
@@ -79,6 +79,7 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
+        # 검색어 입력과 버튼을 한 줄에 배치
         s_col1, s_col2 = st.columns([3, 1])
         with s_col1:
             search_input = st.text_input("소재지 검색", placeholder="동네 이름이나 주소", label_visibility="collapsed")
@@ -86,7 +87,7 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# 필터링 로직
+# 데이터 필터링 실행
 df = st.session_state.df_list
 if filter_status:
     df = df[df['상태'].isin(filter_status)]
