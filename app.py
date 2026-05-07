@@ -30,9 +30,6 @@ def save_data(df):
 # --- [세션 상태 초기화] ---
 if 'df_list' not in st.session_state:
     st.session_state.df_list = load_data()
-if 'land_price' not in st.session_state: st.session_state.land_price = 0
-if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
-if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = ""
 
 # --- [유틸리티 함수] ---
@@ -43,16 +40,6 @@ def process_area(input_str):
     val = float(nums[0])
     if "평" in input_str: return int(val), f"{int(val)}평"
     return int(round(val * 0.3025)), f"{int(round(val * 0.3025))}평"
-
-def calc_values():
-    area_text = st.session_state.get('area_input', '')
-    py_num, _ = process_area(area_text)
-    curr_py = st.session_state.get('py_price', 0)
-    curr_land = st.session_state.get('land_price', 0)
-    if py_num > 0 and curr_py > 0:
-        st.session_state.land_price = int(curr_py * py_num)
-    elif py_num > 0 and curr_land > 0 and curr_py == 0:
-        st.session_state.py_price = int(curr_land / py_num)
 
 category_map = {
     "주거용": ["연립/다세대", "아파트", "단독/다가구", "전원주택", "오피스텔(주거)"],
@@ -66,32 +53,25 @@ with st.expander("➕ 매물 등록하기", expanded=False):
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
         req_purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
+        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
-        addr = st.text_input("소재지 상세", key="addr_input")
-        if gubun == "매매":
-            st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
-            st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
-        elif gubun == "월세":
-            st.number_input("보증금 (만원)", key="land_price", step=0, format="%d")
-            st.number_input("월세 (만원)", key="monthly_rent", step=0, format="%d")
-        else:
-            st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d")
+        addr = st.text_input("소재지 상세")
+        
+        # 금액 입력 세션 직접 관리 대신 일반 변수 사용
+        price = st.number_input("가액/보증금 (만원)", step=0, format="%d")
+        rent = st.number_input("월세 (만원)", step=0, format="%d") if gubun == "월세" else 0
     with col3:
-        area_text = st.text_input("면적 입력", placeholder="", key="area_input", on_change=calc_values)
-        py_num, py_display = process_area(area_text)
-        if area_text: st.info(f"💾 계산 기준 면적: {py_display}")
+        area_text = st.text_input("면적 입력", placeholder="")
+        _, py_display = process_area(area_text)
         st.text_area("특약내용", height=150, key="memo_input")
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
             "의뢰목적": req_purpose, "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
-            "가액": st.session_state.get('land_price', 0), 
-            "월세": st.session_state.get('monthly_rent', 0) if gubun == "월세" else 0,
-            "면적": py_display, "상태": "진행중", "소재지": addr
+            "가액": price, "월세": rent, "면적": py_display, "상태": "진행중", "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         save_data(st.session_state.df_list)
@@ -107,54 +87,44 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        s_col1, s_col2 = st.columns([4, 1])
-        with s_col1:
-            search_input = st.text_input("검색어 입력", value=st.session_state.search_query, placeholder="", label_visibility="collapsed")
-        with s_col2:
+        # 검색어 처리를 위한 텍스트 입력창
+        search_val = st.text_input("검색어 입력", value=st.session_state.search_query, placeholder="", label_visibility="collapsed")
+        c1, c2 = st.columns(2)
+        with c1:
             if st.button("🔍 검색", use_container_width=True):
-                st.session_state.search_query = search_input
+                st.session_state.search_query = search_val
+                st.rerun() # 즉시 화면 갱신
+        with c2:
+            if st.button("🔄 초기화", use_container_width=True):
+                st.session_state.search_query = ""
+                st.rerun()
 
-# --- [초스마트 통합 검색 로직] ---
-df_display = st.session_state.df_list.copy()
+# --- [검색 알고리즘 강화] ---
+df_final = st.session_state.df_list.copy()
 
-# 기본 필터
-if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
-if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
+# 1. 상태/카테고리 필터
+if filter_status: df_final = df_final[df_final['상태'].isin(filter_status)]
+if filter_cat: df_final = df_final[df_final['대분류'].isin(filter_cat)]
 
-# 키워드 검색 (특수문자 무시 기능 추가)
+# 2. 키워드 검색 (공백 기준 다중 AND 조건 + 특수문자 제거)
 if st.session_state.search_query.strip():
     keywords = st.session_state.search_query.split()
     for word in keywords:
-        # 데이터에서 특수문자를 제거한 검색용 텍스트 생성
-        def clean_text(text):
-            return re.sub(r'[^가-힣a-zA-Z0-9\s]', '', str(text))
-        
-        search_target = (
-            df_display['소재지'].apply(clean_text) + ' ' + 
-            df_display['대분류'].apply(clean_text) + ' ' + 
-            df_display['소분류'].apply(clean_text) + ' ' + 
-            df_display['구분'].apply(clean_text) + ' ' + 
-            df_display['의뢰목적'].apply(clean_text) + ' ' +
-            df_display['소분류'].fillna('') # 원본도 포함 (슬래시 있는 경우 대비)
-        )
-        
-        # 검색어에서도 특수문자 제거 후 비교
-        clean_word = clean_text(word)
-        df_display = df_display[
-            search_target.str.contains(clean_word, case=False, na=False) |
-            df_display['소분류'].str.contains(word, case=False, na=False) # 원본 단어로도 검색
-        ]
+        clean_word = re.sub(r'[^가-힣a-zA-Z0-9]', '', word)
+        # 모든 텍스트 열에서 특수문자를 제거하고 통합 검색
+        search_target = df_final.apply(lambda x: re.sub(r'[^가-힣a-zA-Z0-9]', '', " ".join(x.astype(str))), axis=1)
+        df_final = df_final[search_target.str.contains(clean_word, case=False, na=False)]
 
 # 4. 매물 목록 관리
-st.subheader(f"📋 매물 목록 관리 ({len(df_display)}건)")
+st.subheader(f"📋 매물 목록 관리 ({len(df_final)}건)")
+
+# 데이터 에디터에서 인덱스 유지를 위해 별도 처리
 edited_df = st.data_editor(
-    df_display, 
+    df_final, 
     use_container_width=True, 
     hide_index=True, 
     num_rows="dynamic",
     column_config={
-        "가액": st.column_config.NumberColumn("가액/보증금", format="%d"),
-        "월세": st.column_config.NumberColumn("월세", format="%d"),
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
     },
@@ -162,6 +132,13 @@ edited_df = st.data_editor(
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    st.session_state.df_list = edited_df
+    # 검색된 결과에서 수정한 내용을 원본 리스트에 정확히 반영 (인덱스 매칭)
+    # 1. 원본 데이터프레임 복사
+    new_master_df = st.session_state.df_list.copy()
+    # 2. 현재 화면에 보이는 데이터(수정본)의 인덱스를 기준으로 원본 업데이트
+    # (data_editor는 인덱스를 유지하므로 유효함)
+    new_master_df.update(edited_df)
+    
+    st.session_state.df_list = new_master_df
     save_data(st.session_state.df_list)
-    st.toast("저장되었습니다!")
+    st.toast("전체 데이터베이스에 안전하게 저장되었습니다!")
