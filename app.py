@@ -40,9 +40,8 @@ def process_area(input_str):
     if "평" in input_str: return int(val), f"{int(val)}평"
     return int(round(val * 0.3025)), f"{int(round(val * 0.3025))}평"
 
-# --- [카테고리 설정: '전원주택' 삭제] ---
 category_map = {
-    "주거용": ["연립/다세대", "아파트", "단독/다가구", "오피스텔(주거)"], # 전원주택 삭제됨
+    "주거용": ["연립/다세대", "아파트", "단독/다가구", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
@@ -63,7 +62,10 @@ with st.expander("➕ 매물 등록하기", expanded=False):
     with col3:
         area_text = st.text_input("면적 입력(평 또는 ㎡)", placeholder="")
         _, py_display = process_area(area_text)
-        memo = st.text_area("특약내용", height=150)
+        
+        # --- [특약내용 가이드 문구 추가] ---
+        guide_text = "특약, 비밀번호, 방, 욕실, 씽크대, 구조, 난방, 전기용량 등 상세 내용을 입력하세요."
+        memo = st.text_area("특약내용", height=150, placeholder=guide_text)
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_row = pd.DataFrame([{
@@ -98,7 +100,6 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
 
 # --- [필터링 및 검색 로직] ---
 df_display = st.session_state.df_list.copy()
-
 if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
 if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
 
@@ -111,7 +112,6 @@ if st.session_state.search_query.strip():
 
 # 4. 매물 목록 관리
 st.subheader(f"📋 매물 목록 관리 ({len(df_display)}건)")
-
 edited_df = st.data_editor(
     df_display, 
     use_container_width=True, 
