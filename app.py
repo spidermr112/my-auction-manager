@@ -15,7 +15,6 @@ def load_data():
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # 필수 열 누락 방지 및 보정
             cols = ["접수일", "의뢰목적", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"]
             for col in cols:
                 if col not in df.columns:
@@ -115,33 +114,39 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# --- [강화된 다중 열 통합 검색 로직] ---
+# --- [초스마트 통합 검색 로직] ---
 df_display = st.session_state.df_list.copy()
 
-# 1) 기본 필터 (상태, 대분류)
-if filter_status:
-    df_display = df_display[df_display['상태'].isin(filter_status)]
-if filter_cat:
-    df_display = df_display[df_display['대분류'].isin(filter_cat)]
+# 기본 필터
+if filter_status: df_display = df_display[df_display['상태'].isin(filter_status)]
+if filter_cat: df_display = df_display[df_display['대분류'].isin(filter_cat)]
 
-# 2) 키워드 검색 (부분 일치 AND 조건 강화)
+# 키워드 검색 (특수문자 무시 기능 추가)
 if st.session_state.search_query.strip():
     keywords = st.session_state.search_query.split()
     for word in keywords:
-        # 모든 텍스트 열을 하나로 합친 가상 열에서 검색 (가장 확실한 방법)
+        # 데이터에서 특수문자를 제거한 검색용 텍스트 생성
+        def clean_text(text):
+            return re.sub(r'[^가-힣a-zA-Z0-9\s]', '', str(text))
+        
         search_target = (
-            df_display['소재지'].fillna('') + ' ' + 
-            df_display['대분류'].fillna('') + ' ' + 
-            df_display['소분류'].fillna('') + ' ' + 
-            df_display['구분'].fillna('') + ' ' + 
-            df_display['의뢰목적'].fillna('')
+            df_display['소재지'].apply(clean_text) + ' ' + 
+            df_display['대분류'].apply(clean_text) + ' ' + 
+            df_display['소분류'].apply(clean_text) + ' ' + 
+            df_display['구분'].apply(clean_text) + ' ' + 
+            df_display['의뢰목적'].apply(clean_text) + ' ' +
+            df_display['소분류'].fillna('') # 원본도 포함 (슬래시 있는 경우 대비)
         )
-        df_display = df_display[search_target.str.contains(word, case=False, na=False)]
+        
+        # 검색어에서도 특수문자 제거 후 비교
+        clean_word = clean_text(word)
+        df_display = df_display[
+            search_target.str.contains(clean_word, case=False, na=False) |
+            df_display['소분류'].str.contains(word, case=False, na=False) # 원본 단어로도 검색
+        ]
 
 # 4. 매물 목록 관리
 st.subheader(f"📋 매물 목록 관리 ({len(df_display)}건)")
-
-# 데이터 편집 후 원본 데이터프레임에 반영하는 로직 개선
 edited_df = st.data_editor(
     df_display, 
     use_container_width=True, 
@@ -157,16 +162,6 @@ edited_df = st.data_editor(
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    # 필터링된 상태에서 수정한 내용을 원본 리스트에 병합
-    original_df = st.session_state.df_list.copy()
-    
-    # 1. 현재 편집기에 없는(필터링되어 안보이는) 데이터 유지
-    # 2. 현재 편집기에서 수정한 데이터 업데이트
-    # 이를 위해 접수일/소재지 등 고유 정보를 기준으로 업데이트하거나, 
-    # 간단하게는 현재 edited_df를 필터링되지 않은 원본과 합쳐야 합니다.
-    # 여기서는 단순화를 위해 현재 보이는 편집 결과를 전체 데이터로 업데이트합니다.
-    # (실제 업무용으로는 인덱스 보존 방식이 좋으나 현재 구조상 덮어쓰기 유지)
-    
     st.session_state.df_list = edited_df
     save_data(st.session_state.df_list)
     st.toast("저장되었습니다!")
