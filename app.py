@@ -12,12 +12,10 @@ st.title("🏘️ 파크부동산")
 DB_FILE = "property_db.csv"
 
 def load_data():
-    # 요청하신 순서대로 컬럼 재배치 (의뢰목적이 맨 앞으로)
     cols = ["의뢰목적", "소분류", "구분", "소재지", "면적", "가액", "월세", "대분류", "접수일", "상태"]
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # 기존 데이터가 있을 경우 열 순서 보정 및 누락 열 생성
             for col in cols:
                 if col not in df.columns:
                     df[col] = 0 if col in ["가액", "월세"] else "-"
@@ -29,13 +27,11 @@ def load_data():
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
 
-# --- [세션 상태 초기화] ---
 if 'df_list' not in st.session_state:
     st.session_state.df_list = load_data()
 if 'search_query' not in st.session_state: 
     st.session_state.search_query = ""
 
-# --- [유틸리티 함수] ---
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
     nums = re.findall(r"[-+]?\d*\.\d+|\d+", input_str)
@@ -44,8 +40,9 @@ def process_area(input_str):
     if "평" in input_str: return int(val), f"{int(val)}평"
     return int(round(val * 0.3025)), f"{int(round(val * 0.3025))}평"
 
+# --- [카테고리 설정: '전원주택' 삭제] ---
 category_map = {
-    "주거용": ["연립/다세대", "아파트", "단독/다가구", "전원주택", "오피스텔(주거)"],
+    "주거용": ["연립/다세대", "아파트", "단독/다가구", "오피스텔(주거)"], # 전원주택 삭제됨
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
