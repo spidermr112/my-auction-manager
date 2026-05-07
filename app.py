@@ -15,13 +15,15 @@ def load_data():
     if os.path.exists(DB_FILE):
         try:
             df = pd.read_csv(DB_FILE)
-            # '월세' 열이 없으면 새로 생성 (기존 데이터 호환용)
+            # 새 항목들(의뢰목적, 월세)이 기존 파일에 없을 경우를 대비해 보정
+            if "의뢰목적" not in df.columns:
+                df.insert(1, "의뢰목적", "매도의뢰") # 접수일 다음 칸에 추가
             if "월세" not in df.columns:
                 df["월세"] = 0
             return df
         except:
             pass
-    return pd.DataFrame(columns=["접수일", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"])
+    return pd.DataFrame(columns=["접수일", "의뢰목적", "대분류", "소분류", "구분", "가액", "월세", "면적", "상태", "소재지"])
 
 def save_data(df):
     df.to_csv(DB_FILE, index=False, encoding='utf-8-sig')
@@ -30,7 +32,7 @@ def save_data(df):
 if 'df_list' not in st.session_state:
     st.session_state.df_list = load_data()
 if 'land_price' not in st.session_state: st.session_state.land_price = 0
-if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0 # 월세 세션 추가
+if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = ""
 
@@ -65,13 +67,16 @@ with st.expander("➕ 매물 등록하기", expanded=True):
     col1, col2, col3 = st.columns(3)
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
+        # [추가 항목] 의뢰목적 라디오 버튼
+        req_purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
+        st.write("---")
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
+    
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # --- [월세 분리 로직] ---
         if gubun == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
@@ -85,19 +90,20 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         area_text = st.text_input("면적 입력", placeholder="예: 100평 또는 330", key="area_input", on_change=calc_values)
         py_num, py_display = process_area(area_text)
         if area_text: st.info(f"💾 계산 기준 면적: {py_display}")
-        st.text_area("특약내용", height=110, key="memo_input")
+        st.text_area("특약내용", height=150, key="memo_input")
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
+            "의뢰목적": req_purpose, # 의뢰목적 데이터 추가
             "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
             "가액": st.session_state.get('land_price', 0), 
-            "월세": st.session_state.get('monthly_rent', 0) if gubun == "월세" else 0, # 월세 저장
+            "월세": st.session_state.get('monthly_rent', 0) if gubun == "월세" else 0,
             "면적": py_display, "상태": "진행중", "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         save_data(st.session_state.df_list)
-        st.success("매물이 저장되었습니다!")
+        st.success(f"[{req_purpose}] 데이터가 성공적으로 저장되었습니다!")
 
 st.write("") 
 
@@ -131,6 +137,7 @@ edited_df = st.data_editor(
     hide_index=True, 
     num_rows="dynamic",
     column_config={
+        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "가액": st.column_config.NumberColumn("가액/보증금", format="%d"),
         "월세": st.column_config.NumberColumn("월세", format="%d"),
