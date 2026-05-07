@@ -54,7 +54,6 @@ def calc_values():
     elif py_num > 0 and curr_land > 0 and curr_py == 0:
         st.session_state.py_price = int(curr_land / py_num)
 
-# --- [카테고리 설정] ---
 category_map = {
     "주거용": ["연립/다세대", "아파트", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
@@ -68,21 +67,18 @@ with st.expander("➕ 매물 등록하기", expanded=False):
         reg_date = st.date_input("접수일", datetime.today())
         req_purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
-    
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         gubun = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
-        
         if gubun == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
         elif gubun == "월세":
             st.number_input("보증금 (만원)", key="land_price", step=0, format="%d")
             st.number_input("월세 (만원)", key="monthly_rent", step=0, format="%d")
-        else: # 전세
+        else:
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d")
-            
     with col3:
         area_text = st.text_input("면적 입력", placeholder="예: 100평 또는 330", key="area_input", on_change=calc_values)
         py_num, py_display = process_area(area_text)
@@ -92,15 +88,14 @@ with st.expander("➕ 매물 등록하기", expanded=False):
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
-            "의뢰목적": req_purpose,
-            "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
+            "의뢰목적": req_purpose, "대분류": main_cat, "소분류": sub_cat, "구분": gubun,
             "가액": st.session_state.get('land_price', 0), 
             "월세": st.session_state.get('monthly_rent', 0) if gubun == "월세" else 0,
             "면적": py_display, "상태": "진행중", "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
         save_data(st.session_state.df_list)
-        st.success(f"[{req_purpose}] 데이터가 저장되었습니다!")
+        st.success("저장 완료!")
 
 st.write("") 
 
@@ -112,37 +107,36 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        s_col1, s_col2 = st.columns([3, 1])
+        s_col1, s_col2 = st.columns([4, 1])
         with s_col1:
-            # 검색창 디자인 유지
-            search_input = st.text_input("검색어 입력", placeholder="예: 월세 가곡리", label_visibility="collapsed")
+            # 촌스러운 예시(placeholder) 제거 및 빈칸 유지
+            search_input = st.text_input("검색어 입력", value=st.session_state.search_query, placeholder="", label_visibility="collapsed")
         with s_col2:
             if st.button("🔍 검색", use_container_width=True):
                 st.session_state.search_query = search_input
 
-# --- [강화된 필터링 로직] ---
+# --- [강화된 필터링 로직: 다중 키워드 AND 조건] ---
 df_filtered = st.session_state.df_list.copy()
 
-# 1) 상태 및 카테고리 필터링
+# 상태 및 대분류 기본 필터
 if filter_status:
     df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
 if filter_cat:
     df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
 
-# 2) 다중 키워드 검색 로직 (핵심 수정 사항)
-if st.session_state.search_query:
-    # 검색어를 공백 기준으로 나눕니다 (예: "월세 가곡리" -> ["월세", "가곡리"])
+# 키워드 검색 필터 (띄어쓰기 기준 단어 모두 포함 여부 검사)
+if st.session_state.search_query.strip():
     keywords = st.session_state.search_query.split()
-    
     for word in keywords:
-        # 각 단어가 소재지, 구분, 소분류 등 어디에든 포함되어 있는지 검사 (AND 조건)
-        # 소재지뿐만 아니라 '구분(월세)' 항목도 함께 검색 대상에 포함시켰습니다.
-        df_filtered = df_filtered[
+        # 모든 열을 합쳐서 검색하거나, 주요 열들에서 검색
+        mask = (
             df_filtered['소재지'].str.contains(word, na=False, case=False) |
-            df_filtered['구분'].str.contains(word, na=False, case=False) |
+            df_filtered['대분류'].str.contains(word, na=False, case=False) |
             df_filtered['소분류'].str.contains(word, na=False, case=False) |
+            df_filtered['구분'].str.contains(word, na=False, case=False) |
             df_filtered['의뢰목적'].str.contains(word, na=False, case=False)
-        ]
+        )
+        df_filtered = df_filtered[mask]
 
 # 4. 매물 목록 관리
 st.subheader(f"📋 매물 목록 관리 ({len(df_filtered)}건)")
@@ -152,18 +146,15 @@ edited_df = st.data_editor(
     hide_index=True, 
     num_rows="dynamic",
     column_config={
-        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
-        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "가액": st.column_config.NumberColumn("가액/보증금", format="%d"),
         "월세": st.column_config.NumberColumn("월세", format="%d"),
+        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"], required=True),
+        "의뢰목적": st.column_config.SelectboxColumn("의뢰목적", options=["매도의뢰", "매수의뢰"], required=True),
     },
     disabled=["접수일", "대분류", "소분류"]
 )
 
 if st.button("💾 모든 변경 사항 저장", use_container_width=True):
-    # 편집된 데이터(edited_df)를 원본 데이터에 반영할 때, 필터링되지 않은 다른 데이터들도 보존해야 함
-    # 이 부분은 단순 덮어쓰기보다 인덱스 기준으로 업데이트하는 것이 안전하지만, 
-    # 사용자 편의를 위해 현재 화면의 최종 결과물을 저장하도록 유지합니다.
     st.session_state.df_list = edited_df
     save_data(st.session_state.df_list)
     st.toast("저장되었습니다!")
