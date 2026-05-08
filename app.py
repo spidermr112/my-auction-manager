@@ -40,7 +40,6 @@ if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
 if 'df_list' not in st.session_state:
-    # 월세 열 추가
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지"])
 
 # --- [유틸리티 함수] ---
@@ -122,9 +121,20 @@ with st.expander("➕ 매물 등록하기", expanded=True):
             "월세": st.session_state.monthly_rent if deal_type == "월세" else 0,
             "상태": "진행중", "소재지": addr
         }])
+        # 최신순 저장
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
+        
+        # --- [수정 포인트: 저장 후 입력란 초기화] ---
+        # 관련 세션 상태값 초기화
+        st.session_state.land_price = 0
+        st.session_state.py_price = 0
+        st.session_state.monthly_rent = 0
+        
         st.success(f"[{client_name}]님의 매물이 리스트 최상단에 저장되었습니다!")
         st.balloons()
+        
+        # 페이지 재실행을 통해 입력창 UI 초기화
+        st.rerun()
 
 st.divider()
 
@@ -146,7 +156,6 @@ if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_ca
 if st.session_state.search_query:
     df_filtered = df_filtered[df_filtered['소재지'].str.contains(st.session_state.search_query, na=False)]
 
-# --- [수정 포인트: 매물 목록 관리 열 순서 변경] ---
 st.subheader(f"📋 매물 목록 관리 (조회: {len(df_filtered)}건)")
 edited_df = st.data_editor(
     df_filtered,
@@ -165,7 +174,6 @@ edited_df = st.data_editor(
         "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
     },
-    # 표시 순서 강제 지정
     column_order=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
