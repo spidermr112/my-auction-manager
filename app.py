@@ -87,12 +87,10 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # --- [수정 포인트: 토지 매매일 때만 평단가 표시] ---
         if main_cat == "토지" and deal_type == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
         else:
-            # 토지 월세/전세 혹은 일반 주거/비주거용
             st.number_input("가액/보증금 (만원)", key="land_price", step=0, format="%d")
             
         if deal_type == "월세":
@@ -136,7 +134,7 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# --- [하단 매물 목록 관리 (기존과 동일)] ---
+# --- [매물 필터링 및 목록 관리] ---
 if 'filter_status' not in st.session_state: st.session_state.filter_status = ["진행중", "보류"]
 
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
@@ -168,13 +166,14 @@ edited_df = st.data_editor(
         "연락처": st.column_config.TextColumn("📞 연락처"),
         "대분류": st.column_config.TextColumn("📁 대분류"),
         "소분류": st.column_config.TextColumn("📂 소분류"),
+        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
         "면적": st.column_config.TextColumn("📏 면적"),
         "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d"),
         "월세": st.column_config.NumberColumn("💵 월세(만원)", format="%d"),
         "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
-        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
     },
-    column_order=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지"],
+    # --- [수정 포인트: 소재지 상세를 소분류 뒤로 이동] ---
+    column_order=["접수일", "고객명", "연락처", "대분류", "소분류", "소재지", "면적", "가액", "월세", "상태"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
 
