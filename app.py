@@ -26,10 +26,11 @@ def get_dynamic_template(sub_cat, deal_type):
             check_items += ["필지별 면적 확인", "건물 포함 여부", "개별매매 불가 명시"]
 
     tmpl = f"[{sub_cat} {deal_type} 상세]\n"
+    # 주거용 & 비주거용 건물일 때 '비밀번호' 항목 추가
     if sub_cat in residential_cats:
-        tmpl += "- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
+        tmpl += "- 비밀번호: \n- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
     elif sub_cat in commercial_building_cats:
-        tmpl += "- 전용면적: \n- 현재업종: \n- 주차대수: \n- 화장실 위치: "
+        tmpl += "- 비밀번호: \n- 전용면적: \n- 현재업종: \n- 주차대수: \n- 화장실 위치: "
     elif sub_cat == "복수토지":
         tmpl += "- 매각 대상 필지수: \n- 총 면적 합계: \n- 건물 포함 여부: \n- 공부상 지목들: "
     else:
@@ -43,7 +44,6 @@ if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
 if 'df_list' not in st.session_state:
-    # 특약사항 열 추가
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
 # --- [유틸리티 함수] ---
@@ -127,7 +127,7 @@ with st.expander("➕ 매물 등록하기", expanded=True):
             "가액": st.session_state.get('land_price', 0), 
             "월세": st.session_state.get('monthly_rent', 0) if deal_type == "월세" else 0,
             "상태": "진행중", "소재지": addr,
-            "특약사항": memo # 특약 내용 저장 로직 추가
+            "특약사항": memo
         }])
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
         st.success(f"[{client_name}]님의 매물이 저장되었습니다!")
@@ -173,9 +173,8 @@ edited_df = st.data_editor(
         "연락처": st.column_config.TextColumn("📞 연락처"),
         "접수일": st.column_config.TextColumn("📅 접수일"),
         "대분류": st.column_config.TextColumn("📁 대분류"),
-        "특약사항": st.column_config.TextColumn("📝 특약사항", width="medium"), # 특약사항 표시 추가
+        "특약사항": st.column_config.TextColumn("📝 특약사항", width="medium"),
     },
-    # 실무 최적화 순서 (상태 -> 주소 -> 물건종류 -> 가격)
     column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "접수일", "대분류", "특약사항"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
