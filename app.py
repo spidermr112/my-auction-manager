@@ -18,10 +18,6 @@ def get_dynamic_template(sub_cat, deal_type):
 if 'df_list' not in st.session_state:
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
-# 선택된 매물을 기억하기 위한 세션 상태
-if 'detail_target' not in st.session_state:
-    st.session_state.detail_target = None
-
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
     nums = re.findall(r"[-+]?\d*\.\d+|\d+", input_str)
@@ -74,48 +70,45 @@ if not df_filtered.empty:
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
-# --- [새로운 방식: 리스트형 버튼 상세보기] ---
 if not df_filtered.empty:
-    # 1. 편집 기능은 별도로 두고, 상세보기는 버튼으로 구현
-    with st.expander("📝 목록 데이터 수정 (필요할 때만 열기)", expanded=False):
-        edited_data = st.data_editor(df_filtered, use_container_width=True, hide_index=True)
-        if st.button("💾 변경 사항 저장"):
-            st.session_state.df_list.update(edited_data)
-            st.rerun()
+    # --- [핵심: 스크롤 없는 단일 선택기] ---
+    # 표 바로 위에 드롭다운을 두어 선택하게 합니다.
+    select_list = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
+    target_idx = st.selectbox("🎯 상세 정보를 보려면 매물을 선택하세요", 
+                             options=list(select_list.keys()), 
+                             format_func=lambda x: select_list[x])
 
-    st.caption("👇 매물 정보를 보려면 해당 행의 [🔎 상세] 버튼을 누르세요.")
+    # 목록 편집기는 그대로 유지 (오류 인자 제거)
+    edited_data = st.data_editor(
+        df_filtered,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+            "특약사항": None
+        },
+        column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
+    )
+
+    if st.button("💾 목록 변경 사항 저장", use_container_width=True):
+        st.session_state.df_list.update(edited_data)
+        st.toast("변경사항이 저장되었습니다.")
+
+    # 4. 하단 상세 정보창
+    st.markdown("---")
+    item = df_filtered.loc[target_idx]
+    st.markdown(f"### 🔍 [{item['소재지']}] 상세 특약")
     
-    # 모바일에서 보기 편하도록 한 줄씩 버튼 배치
-    for i, row in df_filtered.iterrows():
-        cols = st.columns([1, 5, 2, 2])
-        with cols[0]: # 상세 보기 버튼
-            if st.button(f"🔎 상세", key=f"btn_{i}"):
-                st.session_state.detail_target = i
-        with cols[1]:
-            st.write(f"**{row['소재지']}**")
-        with cols[2]:
-            st.write(f"{row['소분류']} / {row['가액']}")
-        with cols[3]:
-            st.write(f"({row['상태']})")
-        st.divider() # 행 구분선
-
-    # 4. 하단 상세 정보창 (버튼 클릭 시 연동)
-    if st.session_state.detail_target is not None:
-        target_idx = st.session_state.detail_target
-        if target_idx in st.session_state.df_list.index:
-            item = st.session_state.df_list.loc[target_idx]
-            st.markdown(f"### 🔍 [{item['소재지']}] 매물 상세 정보")
-            with st.container(border=True):
-                c1, c2 = st.columns([1, 2])
-                with c1:
-                    st.info(f"📍 **{item['소재지']}**")
-                    st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-                    st.write(f"📞 **고객:** {item['고객명']} / {item['연락처']}")
-                    st.success(f"💰 **가액:** {item['가액']} / {item['월세']}")
-                with c2:
-                    st.markdown("**📜 상세 특약내용 및 비밀번호**")
-                    st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{target_idx}")
-        else:
-            st.session_state.detail_target = None
+    with st.container(border=True):
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            st.info(f"📍 **{item['소재지']}**")
+            st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
+            st.write(f"📞 **고객:** {item['고객명']} / {item['연락처']}")
+            st.success(f"💰 **가액:** {item['가액']} / {item['월세']}")
+        with c2:
+            st.markdown("**📜 상세 특약 및 메모**")
+            st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{target_idx}")
 else:
     st.info("조회된 매물이 없습니다.")
