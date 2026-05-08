@@ -112,6 +112,7 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         memo = st.text_area("특약내용", value=combined_memo, height=200, key="memo_input")
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
+        # 1. 새 데이터 생성
         new_row = pd.DataFrame([{
             "접수일": reg_date.strftime("%Y-%m-%d"),
             "고객명": client_name, "연락처": client_phone,
@@ -121,19 +122,15 @@ with st.expander("➕ 매물 등록하기", expanded=True):
             "월세": st.session_state.monthly_rent if deal_type == "월세" else 0,
             "상태": "진행중", "소재지": addr
         }])
-        # 최신순 저장
+        
+        # 2. 최상단에 저장
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
         
-        # --- [수정 포인트: 저장 후 입력란 초기화] ---
-        # 관련 세션 상태값 초기화
-        st.session_state.land_price = 0
-        st.session_state.py_price = 0
-        st.session_state.monthly_rent = 0
-        
+        # 3. 알림 표시 후 페이지 초기화
         st.success(f"[{client_name}]님의 매물이 리스트 최상단에 저장되었습니다!")
         st.balloons()
         
-        # 페이지 재실행을 통해 입력창 UI 초기화
+        # 오류 방지를 위해 값을 직접 대입하지 않고 rerun 호출
         st.rerun()
 
 st.divider()
