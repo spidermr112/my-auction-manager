@@ -52,7 +52,7 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"] 
 }
 
-# 2. 매물 등록 섹션
+# 1. 매물 등록 섹션 (기존 기능)
 with st.expander("➕ 매물 등록하기", expanded=True):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
@@ -79,48 +79,62 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# 3. 매물 목록 및 안전한 선택 연동 섹션
+# 2. 매물 목록 관리 (기존 검색/필터/편집 기능 유지)
 if not st.session_state.df_list.empty:
-    st.subheader(f"📋 매물 목록 (총 {len(st.session_state.df_list)}건)")
+    with st.expander("🔍 매물 필터링 / 검색", expanded=False):
+        f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
+        with f_col1:
+            status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
+        with f_col2:
+            filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
+        with f_col3:
+            search_q = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
+
+    df_filtered = st.session_state.df_list.copy()
+    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+    if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+    if search_q: df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
+
+    st.subheader(f"📋 매물 목록 관리 (조회: {len(df_filtered)}건)")
     
-    # [해결책] 버전 호환을 위해 Selectbox로 상세 매물 선택
-    options = [f"{i}: {row['소재지']} ({row['고객명']})" for i, row in st.session_state.df_list.iterrows()]
-    selected_option = st.selectbox("🔍 상세 내용을 확인할 매물을 선택하세요", options)
+    # [새 기능 추가] 상세 내용을 볼 매물을 선택하는 박스
+    options = [f"{i}: {row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()]
+    selected_option = st.selectbox("🎯 상세 특약 및 비밀번호를 확인할 매물을 선택하세요", options)
     selected_idx = int(selected_option.split(":")[0])
 
-    # 목록 표시 (편집 가능하도록 data_editor 유지)
+    # [기존 기능 유지] 데이터 에디터 (편집 및 관리 가능)
     edited_df = st.data_editor(
-        st.session_state.df_list,
+        df_filtered,
         use_container_width=True,
         hide_index=True,
         column_config={
             "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
             "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-            "특약사항": None # 표에서는 숨김
+            "특약사항": None # 표에서는 숨겨서 깔끔하게 유지
         },
         column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
     )
     
     if st.button("💾 목록 변경 사항 저장", use_container_width=True):
-        st.session_state.df_list = edited_df
-        st.toast("변경사항이 저장되었습니다.")
+        # 편집된 내용을 세션에 반영
+        st.session_state.df_list.update(edited_df)
+        st.toast("변경사항이 성공적으로 저장되었습니다!")
 
-    # 4. 하단 상세 연동창
+    # [새 기능 추가] 선택 매물 하단 상세 보기
     st.markdown("---")
     st.markdown("### 🔍 선택 매물 상세 특약 확인")
     
-    item = st.session_state.df_list.iloc[selected_idx]
+    item = st.session_state.df_list.loc[selected_idx]
     
-    with st.container():
+    with st.container(border=True):
         c1, c2 = st.columns([1, 2])
         with c1:
             st.info(f"📍 **{item['소재지']}**")
             st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-            st.write(f"👤 **의뢰인:** {item['고객명']} ({item['연락처']})")
+            st.write(f"👤 **의뢰인:** {item['고객명']} / {item['연락처']}")
             st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
         with c2:
             st.markdown("**📜 상세 특약 및 메모**")
-            memo_val = item.get('특약사항', "내용 없음")
-            st.text_area("상세내용", value=memo_val, height=250, label_visibility="collapsed", key=f"view_{selected_idx}")
+            st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{selected_idx}")
 else:
-    st.info("등록된 매물이 없습니다. 매물을 먼저 등록해주세요.")
+    st.info("등록된 매물이 없습니다.")
