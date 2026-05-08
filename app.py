@@ -7,12 +7,11 @@ import re
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
 st.title("🏘️ 파크부동산 매물 등록 시스템")
 
-# --- [데이터 및 유틸리티 - 기존 로직 유지] ---
+# --- [기존 함수들 - 절대 변경 없음] ---
 def get_dynamic_template(sub_cat, deal_type):
     check_items = ["현 시설 상태", "입주시기 협의"]
     res_cats = ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"]
-    if sub_cat in res_cats:
-        check_items += ["장기수선충당금", "발코니 확장", "수리 여부"]
+    if sub_cat in res_cats: check_items += ["장기수선충당금", "발코니 확장", "수리 여부"]
     tmpl = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
     return check_items, tmpl
 
@@ -29,7 +28,7 @@ def process_area(input_str):
 
 category_map = {"주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"], "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"]}
 
-# 2. 매물 등록하기
+# 2. 매물 등록하기 (기존 유지)
 with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
@@ -56,7 +55,7 @@ with st.expander("➕ 매물 등록하기", expanded=False):
 
 st.divider()
 
-# 3. 매물 목록 및 필터 (기존 유지)
+# 3. 매물 필터링 및 목록 관리
 with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -71,47 +70,54 @@ if not df_filtered.empty:
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
-# [핵심 수정] 오류 없는 라디오 버튼식 선택 구현
+# [핵심] 표 내부에 '선택' 버튼 구현 (다중 선택 방지 로직 포함)
 if not df_filtered.empty:
-    # 1. 하단 상세보기를 위한 '라디오 버튼식' 선택박스
-    st.caption("💡 아래 목록에서 상세 내용을 확인할 매물을 하나만 선택해 주세요.")
-    select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
-    chosen_index = st.radio("상세 확인 대상 선택", options=list(select_options.keys()), 
-                           format_func=lambda x: select_options[x], horizontal=True, label_visibility="collapsed")
+    # '선택' 컬럼 추가 (불리언 타입)
+    if "선택" not in df_filtered.columns:
+        df_filtered.insert(0, "선택", False)
 
-    # 2. 데이터 편집기 (오류 원인이었던 on_select 제거)
+    # 데이터 편집기 실행
     edited_df = st.data_editor(
         df_filtered,
         use_container_width=True,
-        hide_index=False,
+        hide_index=True,
         column_config={
+            "선택": st.column_config.CheckboxColumn("선택", help="상세 내용을 보려면 체크하세요."),
             "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
             "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-            "특약사항": None # 표에서는 숨김
+            "특약사항": None
         },
-        column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
+        column_order=["선택", "상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
     )
 
-    if st.button("💾 목록 변경 사항 저장", use_container_width=True):
-        # 편집된 내용 반영 (인덱스 기준 업데이트)
-        for i, row in edited_df.iterrows():
-            st.session_state.df_list.loc[i] = row
-        st.toast("저장되었습니다.")
-
-    # 4. 선택 매물 상세 특약 확인 (동적 연동)
+    # 4. 하단 상세 정보 연동 (다중 선택 시 가장 마지막 것만 표시하여 라디오처럼 작동)
+    selected_indices = edited_df[edited_df["선택"] == True].index.tolist()
+    
     st.markdown("---")
     st.markdown("### 🔍 선택 매물 상세 특약 확인")
-    
-    item = df_filtered.loc[chosen_index]
-    with st.container(border=True):
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            st.info(f"📍 **{item['소재지']}**")
-            st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-            st.write(f"📞 **고객:** {item['고객명']} / {item['연락처']}")
-            st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
-        with c2:
-            st.markdown("**📜 상세 특약내용 및 비밀번호**")
-            st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{chosen_index}")
+
+    if selected_indices:
+        # 여러 개 선택해도 가장 마지막에 클릭한(인덱스가 큰) 것 하나만 보여줌 (라디오 효과)
+        target_idx = selected_indices[-1]
+        item = df_filtered.loc[target_idx]
+        
+        with st.container(border=True):
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.info(f"📍 **{item['소재지']}**")
+                st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
+                st.write(f"👤 **고객:** {item['고객명']} / {item['연락처']}")
+                st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
+            with c2:
+                st.markdown("**📜 상세 특약내용 및 비밀번호**")
+                st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{target_idx}")
+    else:
+        st.info("목록에서 보고 싶은 매물의 '선택' 칸을 체크해 주세요.")
+
+    # 저장 버튼
+    if st.button("💾 목록 변경 사항 저장", use_container_width=True):
+        final_save = edited_df.drop(columns=["선택"])
+        st.session_state.df_list.update(final_save)
+        st.toast("변경사항이 저장되었습니다.")
 else:
     st.info("조회된 매물이 없습니다.")
