@@ -7,27 +7,37 @@ import re
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
 st.title("🏘️ 파크부동산 매물 등록 시스템")
 
-# --- [데이터 정의: 특약 템플릿 및 체크리스트] ---
-TEMPLATES = {
-    "아파트": "🏢 [아파트 상세]\n- 로열층 여부: \n- 확장/수리 상태: \n- 관리비 정산: \n- 입주 가능일: ",
-    "연립/다세대": "🏠 [연립/다세대 상세]\n- 결로/곰팡이 확인: \n- 방/욕실 수: \n- 주차 가능여부: \n- 불법건축물 여부: ",
-    "상가/사무실": "🛍️ [상가 상세]\n- 부가세 별도 여부: \n- 권리금 유무: \n- 전기 용량: \n- 원상복구 조건: ",
-    "대지": "🌳 [토지 상세]\n- 지목/용도: \n- 진입로 확보: \n- 지상물 처리: \n- 개발부담금: ",
-}
+# --- [데이터 정의: 소분류 + 구분에 따른 정교한 템플릿] ---
+def get_dynamic_template(sub_cat, deal_type):
+    # 1. 체크리스트 항목 정의
+    check_items = ["현 시설 상태", "입주시기 협의"] # 공통 기본
+    if sub_cat == "아파트":
+        check_items += ["장기수선충당금", "발코니 확장", "수리 여부"]
+        if deal_type == "매매": check_items += ["융자 상환/말소", "가구 포함 여부"]
+        else: check_items += ["수도/난방 점검", "반려동물 여부"]
+    elif sub_cat == "상가/사무실":
+        check_items += ["부가세 별도", "권리금 확인", "원상복구", "렌트프리"]
+        if deal_type == "월세": check_items += ["전기 용량", "관리비 포함 내역"]
+    elif sub_cat == "대지":
+        check_items += ["진입로 확인", "지상 적치물", "농취증", "토지거래허가"]
 
-CHECKLIST_ITEMS = {
-    "아파트": ["장기수선충당금", "커뮤니티 시설", "융자 상환 조건"],
-    "연립/다세대": ["결로/곰팡이 없음", "수도/난방 정상", "내부 비번 확보"],
-    "상가/사무실": ["부가세 별도 명시", "렌트프리 기간", "현 업종 승계"],
-    "대지": ["진입로 확인", "농취증 필요여부", "토지거래허가"]
-}
+    # 2. 텍스트 템플릿 정의
+    tmpl = f"[{sub_cat} {deal_type} 상세]\n"
+    if sub_cat == "아파트":
+        tmpl += "- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
+    elif sub_cat == "상가/사무실":
+        tmpl += "- 전용면적: \n- 현재업종: \n- 주차대수: \n- 화장실 위치: "
+    else:
+        tmpl += "- 용도지역: \n- 지목: \n- 현재이용상태: "
+
+    return check_items, tmpl
 
 # --- [세션 상태 초기화] ---
 if 'land_price' not in st.session_state: st.session_state.land_price = 0
 if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
 if 'df_list' not in st.session_state:
-    st.session_state.df_list = pd.DataFrame(columns=["접수일", "대분류", "소분류", "가액", "면적", "상태", "소재지"])
+    st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "가액", "면적", "상태", "소재지"])
 
 # --- [유틸리티 함수] ---
 def process_area(input_str):
@@ -43,7 +53,6 @@ def calc_values():
     py_num, _ = process_area(area_text)
     current_py_price = st.session_state.get('py_price', 0)
     current_land_price = st.session_state.get('land_price', 0)
-
     if py_num > 0 and current_py_price > 0:
         st.session_state.land_price = int(current_py_price * py_num)
     elif py_num > 0 and current_land_price > 0 and current_py_price == 0:
@@ -62,14 +71,17 @@ with st.expander("➕ 매물 등록하기", expanded=True):
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
         purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, index=0)
+        # --- [고객정보 입력란 추가] ---
+        st.markdown("👤 **고객 정보**")
+        client_name = st.text_input("고객명", placeholder="이름 입력", key="client_name")
+        client_phone = st.text_input("연락처", placeholder="010-0000-0000", key="client_phone")
+        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
 
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
-        st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
+        deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # 가액 입력창 (토지일 경우 평단가 연동 활성화)
         if main_cat == "토지":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
@@ -77,38 +89,36 @@ with st.expander("➕ 매물 등록하기", expanded=True):
             st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d")
 
     with col3:
-        # 면적 입력 및 자동 계산
         area_text = st.text_input("면적 입력", placeholder="예: 100평 또는 330", key="area_input", on_change=calc_values)
         py_num, py_display = process_area(area_text)
         if area_text: st.info(f"💾 계산 기준 면적: {py_display}")
         
-        # --- [특약 구성 가이드 섹션 추가] ---
+        # --- [소분류 + 구분에 따른 동적 특약 로직] ---
         st.markdown("**📝 특약 체크리스트**")
+        dynamic_checks, dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
+        
         selected_checks = []
-        checks = CHECKLIST_ITEMS.get(sub_cat, [])
         c_cols = st.columns(2)
-        for i, item in enumerate(checks):
+        for i, item in enumerate(dynamic_checks):
             with c_cols[i % 2]:
-                if st.checkbox(item, key=f"check_{item}"):
+                if st.checkbox(item, key=f"check_{sub_cat}_{deal_type}_{item}"):
                     selected_checks.append(f"✅ {item}")
 
-        # 템플릿 + 체크항목 결합
-        base_tmpl = TEMPLATES.get(sub_cat, "상세 내용을 입력하세요.")
         checked_str = "\n".join(selected_checks)
-        combined_memo = f"{base_tmpl}\n\n[체크사항]\n{checked_str}" if selected_checks else base_tmpl
+        combined_memo = f"{dynamic_tmpl}\n\n[체크사항]\n{checked_str}" if selected_checks else dynamic_tmpl
 
-        # 최종 특약내용 입력창 (value에 결합된 텍스트 연동)
         memo = st.text_area("특약내용", value=combined_memo, height=200, key="memo_input")
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
         new_data = {
             "접수일": reg_date.strftime("%Y-%m-%d"),
+            "고객명": client_name, "연락처": client_phone,
             "대분류": main_cat, "소분류": sub_cat,
             "가액": st.session_state.land_price, "면적": py_display,
             "상태": "진행중", "소재지": addr
         }
         st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
-        st.success(f"[{sub_cat}] 매물이 성공적으로 등록되었습니다!")
+        st.success(f"[{client_name}]님의 매물이 성공적으로 등록되었습니다!")
         st.balloons()
 
 st.divider()
@@ -139,6 +149,8 @@ edited_df = st.data_editor(
     num_rows="dynamic", 
     column_config={
         "접수일": st.column_config.TextColumn("📅 접수일"),
+        "고객명": st.column_config.TextColumn("👤 고객명"),
+        "연락처": st.column_config.TextColumn("📞 연락처"),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
         "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d"),
         "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
