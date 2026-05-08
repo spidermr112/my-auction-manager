@@ -7,7 +7,7 @@ import re
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
 st.title("🏘️ 파크부동산 매물 등록 시스템")
 
-# --- [기존 데이터/유틸리티 로직 - 수정 없음] ---
+# --- [기존 데이터/유틸리티 로직 - 변경 없음] ---
 def get_dynamic_template(sub_cat, deal_type):
     check_items = ["현 시설 상태", "입주시기 협의"]
     res_cats = ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"]
@@ -28,7 +28,7 @@ def process_area(input_str):
 
 category_map = {"주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"], "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"]}
 
-# 2. 매물 등록하기 (기존 유지)
+# 2. 매물 등록하기
 with st.expander("➕ 매물 등록하기", expanded=False):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
@@ -69,48 +69,53 @@ if not df_filtered.empty:
     if search_q: df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
-st.caption("💡 목록의 왼쪽 **숫자(Index) 버튼**을 클릭하면 해당 매물의 상세 정보가 하단에 나타납니다.")
 
-# [새로운 방식: 행 선택 모드 활성화]
-# 체크박스를 아예 없애고, 행을 클릭하면 선택되는 시스템을 사용합니다.
-selected_data = st.data_editor(
-    df_filtered,
-    use_container_width=True,
-    hide_index=False, # 왼쪽 숫자 버튼을 살려서 선택점으로 활용
-    on_select="rerun", # 클릭 시 즉시 리런
-    selection_mode="single_row", # <--- 핵심: 딱 한 줄만 선택되도록 강제함
-    column_config={
-        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        "특약사항": None
-    },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
-)
+# --- [새로운 방식: 인덱스 선택기] ---
+if not df_filtered.empty:
+    col_sel, col_empty = st.columns([1, 3])
+    with col_sel:
+        # 목록 맨 왼쪽의 숫자(Index)를 입력받는 칸입니다.
+        # 복수 선택이 원천적으로 불가능하며 딱 하나의 번호만 지정됩니다.
+        selected_index = st.number_input("🔍 상세보기 매물 번호(Index) 선택", 
+                                         min_value=int(df_filtered.index.min()), 
+                                         max_value=int(df_filtered.index.max()), 
+                                         value=int(df_filtered.index.min()),
+                                         step=1)
 
-# 변경 사항 저장 버튼
-if st.button("💾 목록 변경 사항 저장", use_container_width=True):
-    st.session_state.df_list.update(selected_data)
-    st.toast("변경사항이 저장되었습니다.")
+    # 데이터 편집기 (오류를 일으키는 최신 인자들 모두 제거)
+    edited_data = st.data_editor(
+        df_filtered,
+        use_container_width=True,
+        hide_index=False, # 왼쪽 숫자를 보고 번호를 입력할 수 있게 함
+        column_config={
+            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+            "특약사항": None
+        },
+        column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
+    )
 
-# 4. 하단 상세 정보 연동 (절대 꼬이지 않는 방식)
-st.markdown("---")
-st.markdown("### 🔍 선택 매물 상세 특약 확인")
+    if st.button("💾 목록 변경 사항 저장", use_container_width=True):
+        st.session_state.df_list.update(edited_data)
+        st.toast("변경사항이 저장되었습니다.")
 
-# '선택된 행'의 인덱스를 가져와서 데이터 매칭
-if hasattr(selected_data, "selection") and selected_data.selection.rows:
-    # single_row 모드이므로 무조건 0번 요소가 현재 선택된 유일한 행임
-    row_idx = selected_data.selection.rows[0]
-    item = df_filtered.iloc[row_idx]
+    # 4. 하단 상세 정보 연동 (선택된 인덱스 기준)
+    st.markdown("---")
+    st.markdown(f"### 🔍 [번호 {selected_index}] 매물 상세 특약 확인")
     
-    with st.container(border=True):
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            st.info(f"📍 **{item['소재지']}**")
-            st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-            st.write(f"👤 **고객:** {item['고객명']} / {item['연락처']}")
-            st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
-        with c2:
-            st.markdown("**📜 상세 특약내용 및 비밀번호**")
-            st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{row_idx}")
+    try:
+        item = df_filtered.loc[selected_index]
+        with st.container(border=True):
+            c1, c2 = st.columns([1, 2])
+            with c1:
+                st.info(f"📍 **{item['소재지']}**")
+                st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
+                st.write(f"👤 **고객:** {item['고객명']} / {item['연락처']}")
+                st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
+            with c2:
+                st.markdown("**📜 상세 특약내용 및 비밀번호**")
+                st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"view_{selected_index}")
+    except:
+        st.warning("선택한 번호가 현재 필터링된 목록에 없습니다. 목록 왼쪽의 숫자를 확인해주세요.")
 else:
-    st.info("매물 목록 왼쪽의 숫자(Index)를 클릭하여 상세 정보를 확인하세요.")
+    st.info("조회된 매물이 없습니다.")
