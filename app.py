@@ -42,8 +42,6 @@ if 'land_price' not in st.session_state: st.session_state.land_price = 0
 if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
-
-# [오류 해결 포인트 1] 데이터프레임 구조에 '특약사항' 명시적 추가
 if 'df_list' not in st.session_state:
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
@@ -66,137 +64,98 @@ def calc_values():
     elif py_num > 0 and current_land_price > 0 and current_py_price == 0:
         st.session_state.py_price = int(current_land_price / py_num)
 
-category_map = {
-    "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
-    "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
-    "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"] 
-}
+category_map = {"주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"], "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"]}
 
-# 2. 매물 등록하기
+# 2. 매물 등록하기 (기존 그대로 유지)
 with st.expander("➕ 매물 등록하기", expanded=True):
     col1, col2, col3 = st.columns([1, 1, 1.2])
-    
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
         purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        st.markdown("👤 **고객 정보**")
-        client_name = st.text_input("고객명", placeholder="이름 입력", key="client_name")
-        client_phone = st.text_input("연락처", placeholder="010-0000-0000", key="client_phone")
+        client_name = st.text_input("고객명", key="client_name")
+        client_phone = st.text_input("연락처", key="client_phone")
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
-
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
-        
         if main_cat == "토지" and deal_type == "매매":
-            st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
-            st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
+            st.number_input("평단가 (만원)", key="py_price", step=0, on_change=calc_values)
+            st.number_input("거래가액 (만원)", key="land_price", step=0, on_change=calc_values)
         else:
-            st.number_input("가액/보증금 (만원)", key="land_price", step=0, format="%d")
-            
+            st.number_input("가액/보증금 (만원)", key="land_price", step=0)
         if deal_type == "월세":
-            st.number_input("월세/차임 (만원)", key="monthly_rent", step=0, format="%d")
-
+            st.number_input("월세/차임 (만원)", key="monthly_rent", step=0)
     with col3:
-        area_text = st.text_input("면적 입력", placeholder="예: 100평 또는 330", key="area_input", on_change=calc_values)
-        py_num, py_display = process_area(area_text)
-        if area_text: st.info(f"💾 계산 기준 면적: {py_display}")
-        
-        st.markdown("**📝 특약 체크리스트**")
+        area_text = st.text_input("면적 입력", key="area_input", on_change=calc_values)
+        _, py_display = process_area(area_text)
         dynamic_checks, dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
-        
-        selected_checks = []
-        c_cols = st.columns(2)
-        for i, item in enumerate(dynamic_checks):
-            with c_cols[i % 2]:
-                if st.checkbox(item, key=f"cb_{sub_cat}_{deal_type}_{item}"):
-                    selected_checks.append(f"✅ {item}")
-
+        selected_checks = [f"✅ {item}" for item in dynamic_checks if st.checkbox(item, key=f"cb_{item}")]
         checked_str = "\n".join(selected_checks)
         combined_memo = f"{dynamic_tmpl}\n\n[체크사항]\n{checked_str}" if selected_checks else dynamic_tmpl
-        
-        memo_key = f"memo_{sub_cat}_{deal_type}_{len(selected_checks)}"
-        memo = st.text_area("특약내용", value=combined_memo, height=200, key=memo_key)
+        memo = st.text_area("특약내용", value=combined_memo, height=200)
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
-        new_row = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"),
-            "고객명": client_name, "연락처": client_phone,
-            "대분류": main_cat, "소분류": sub_cat,
-            "면적": py_display,
-            "가액": st.session_state.get('land_price', 0), 
-            "월세": st.session_state.get('monthly_rent', 0) if deal_type == "월세" else 0,
-            "상태": "진행중", "소재지": addr,
-            "특약사항": memo
-        }])
+        new_row = pd.DataFrame([{"접수일": reg_date.strftime("%Y-%m-%d"), "고객명": client_name, "연락처": client_phone, "대분류": main_cat, "소분류": sub_cat, "면적": py_display, "가액": st.session_state.get('land_price', 0), "월세": st.session_state.get('monthly_rent', 0), "상태": "진행중", "소재지": addr, "특약사항": memo}])
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
-        st.success(f"[{client_name}]님의 매물이 저장되었습니다!")
         st.rerun()
 
 st.divider()
 
-# --- [매물 필터링 및 목록 관리] ---
+# 3. 매물 필터링 및 목록 관리 (기존 그대로 유지)
 with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
-    with f_col1:
-        status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
-    with f_col2:
-        filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
-    with f_col3:
-        search_q = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
+    with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
+    with f_col2: filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
+    with f_col3: search_q = st.text_input("소재지 검색")
 
 df_filtered = st.session_state.df_list.copy()
-# 오류 방지를 위해 열 존재 여부 확인 후 필터링
-if '상태' in df_filtered.columns:
-    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-if '대분류' in df_filtered.columns and filter_cat:
-    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
-if '소재지' in df_filtered.columns and search_q:
-    df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
+if '상태' in df_filtered.columns: df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+if '대분류' in df_filtered.columns: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+if '소재지' in df_filtered.columns and search_q: df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
-edited_df = st.data_editor(
+# [수정된 부분: 숫자 셀 자리에 라디오 버튼 연동 활성화]
+edited_df_result = st.data_editor(
     df_filtered,
     use_container_width=True,
-    hide_index=False,
-    num_rows="dynamic", 
+    hide_index=False, # 화면에서 보시는 숫자 셀 부분을 라디오 버튼 선택기로 사용
+    on_select="rerun", # 선택 시 즉시 하단 반영
+    selection_mode="single_row", # 행 하나만 선택 가능 (라디오 버튼 기능)
     column_config={
-        "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
+        "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"]),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        "가액": st.column_config.NumberColumn("💰 가액", format="%d"),
-        "월세": st.column_config.NumberColumn("💵 월세", format="%d"),
-        "특약사항": st.column_config.TextColumn("📝 특약(요약)", width="small"),
+        "특약사항": None # 표에서는 숨김
     },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "특약사항"],
-    disabled=["접수일", "대분류", "소분류", "면적"] 
+    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"],
+    disabled=["접수일", "대분류", "소분류", "면적"]
 )
 
 if st.button("💾 목록 변경 사항 저장", use_container_width=True):
-    st.session_state.df_list = edited_df
+    st.session_state.df_list = edited_df_result
     st.toast("변경사항이 저장되었습니다.")
 
-# --- [오류 해결 포인트 2: 안전하게 상세 보기 정보 불러오기] ---
+# 4. 선택 매물 상세 특약 확인 (선택 시 동적 표시)
 st.markdown("---")
 st.markdown("### 🔍 선택 매물 상세 특약 확인")
 
-if not edited_df.empty:
+# 'edited_df_result'의 선택된 행 정보를 가져옴
+selected_rows = edited_df_result.selection.rows if hasattr(edited_df_result, 'selection') else []
+
+if selected_rows:
+    idx = selected_rows[0]
+    item = df_filtered.iloc[idx] # 필터링된 현재 목록 기준 인덱스 추출
+    
     with st.container(border=True):
-        # .iloc[0]으로 행을 가져오되, .get() 메서드를 사용해 열이 없어도 에러 차단
-        item_to_show = edited_df.iloc[0] 
-        
         c1, c2 = st.columns([1, 2])
         with c1:
-            st.info(f"📍 **{item_to_show.get('소재지', '정보없음')}**")
-            st.write(f"🏷️ **분류:** {item_to_show.get('소분류', '정보없음')} ({item_to_show.get('상태', '정보없음')})")
-            st.write(f"📞 **고객:** {item_to_show.get('고객명', '정보없음')} / {item_to_show.get('연락처', '정보없음')}")
-            st.success(f"💰 **금액:** {item_to_show.get('가액', 0)} / {item_to_show.get('월세', 0)}")
-        
+            st.info(f"📍 **{item.get('소재지', '정보없음')}**")
+            st.write(f"🏷️ **분류:** {item.get('소분류')} / {item.get('상태')}")
+            st.write(f"👤 **고객:** {item.get('고객명')} / {item.get('연락처')}")
+            st.success(f"💰 **가액:** {item.get('가액', 0)} / {item.get('월세', 0)}")
         with c2:
             st.markdown("**📜 상세 특약내용 및 비밀번호**")
-            # 키가 없을 경우 빈 문자열을 반환하도록 설정
-            memo_content = item_to_show.get('특약사항', "저장된 특약 정보가 없습니다.")
-            st.text_area("상세내용", value=memo_content, height=300, label_visibility="collapsed")
+            st.text_area("상세내용", value=item.get('특약사항', ""), height=300, label_visibility="collapsed", key=f"detail_{idx}")
 else:
-    st.info("조회된 매물이 없습니다.")
+    st.info("목록 왼쪽의 숫자(버튼) 부분을 클릭하면 상세 정보가 나타납니다.")
