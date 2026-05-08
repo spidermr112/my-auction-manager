@@ -87,14 +87,14 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
-        # --- [수정 포인트: 토지여도 월세면 입력창 표시] ---
-        if main_cat == "토지":
+        # --- [수정 포인트: 토지 매매일 때만 평단가 표시] ---
+        if main_cat == "토지" and deal_type == "매매":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
-            st.number_input("거래가액/보증금 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
+            st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
         else:
+            # 토지 월세/전세 혹은 일반 주거/비주거용
             st.number_input("가액/보증금 (만원)", key="land_price", step=0, format="%d")
             
-        # 대분류 상관없이 '월세'일 때 차임 입력창 표시
         if deal_type == "월세":
             st.number_input("월세/차임 (만원)", key="monthly_rent", step=0, format="%d")
 
@@ -136,5 +136,48 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# --- [하단 매물 목록 관리 코드는 이전과 동일] ---
-# ... (이후 코드는 동일하므로 생략)
+# --- [하단 매물 목록 관리 (기존과 동일)] ---
+if 'filter_status' not in st.session_state: st.session_state.filter_status = ["진행중", "보류"]
+
+with st.expander("🔍 매물 필터링 / 검색", expanded=True):
+    f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
+    with f_col1:
+        st.session_state.filter_status = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=st.session_state.filter_status)
+    with f_col2:
+        filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
+    with f_col3:
+        search_input = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
+        if st.button("🔍 검색", use_container_width=True):
+            st.session_state.search_query = search_input
+
+df_filtered = st.session_state.df_list.copy()
+df_filtered = df_filtered[df_filtered['상태'].isin(st.session_state.filter_status)]
+if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+if st.session_state.search_query:
+    df_filtered = df_filtered[df_filtered['소재지'].str.contains(st.session_state.search_query, na=False)]
+
+st.subheader(f"📋 매물 목록 관리 (조회: {len(df_filtered)}건)")
+edited_df = st.data_editor(
+    df_filtered,
+    use_container_width=True,
+    hide_index=True,
+    num_rows="dynamic", 
+    column_config={
+        "접수일": st.column_config.TextColumn("📅 접수일"),
+        "고객명": st.column_config.TextColumn("👤 고객명"),
+        "연락처": st.column_config.TextColumn("📞 연락처"),
+        "대분류": st.column_config.TextColumn("📁 대분류"),
+        "소분류": st.column_config.TextColumn("📂 소분류"),
+        "면적": st.column_config.TextColumn("📏 면적"),
+        "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d"),
+        "월세": st.column_config.NumberColumn("💵 월세(만원)", format="%d"),
+        "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
+        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+    },
+    column_order=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지"],
+    disabled=["접수일", "대분류", "소분류", "면적"] 
+)
+
+if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+    st.session_state.df_list = edited_df
+    st.toast("목록이 성공적으로 업데이트되었습니다!")
