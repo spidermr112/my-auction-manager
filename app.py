@@ -10,12 +10,9 @@ st.title("🏘️ 파크부동산 매물 등록 시스템")
 # --- [데이터 정의: 소분류 + 구분에 따른 정교한 템플릿] ---
 def get_dynamic_template(sub_cat, deal_type):
     check_items = ["현 시설 상태", "입주시기 협의"]
-    
-    # 카테고리 그룹 정의
     residential_cats = ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"]
     commercial_building_cats = ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"]
     
-    # 1. 체크리스트 항목 설정
     if sub_cat in residential_cats:
         check_items += ["장기수선충당금", "발코니 확장", "수리 여부"]
         if deal_type == "매매": check_items += ["융자 상환/말소", "가구 포함 여부"]
@@ -28,15 +25,14 @@ def get_dynamic_template(sub_cat, deal_type):
         if sub_cat == "복수토지":
             check_items += ["필지별 면적 확인", "건물 포함 여부", "개별매매 불가 명시"]
 
-    # 2. 텍스트 템플릿 설정
     tmpl = f"[{sub_cat} {deal_type} 상세]\n"
     if sub_cat in residential_cats:
         tmpl += "- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
-    elif sub_cat in commercial_building_cats: # 빌딩/건물 등 포함
+    elif sub_cat in commercial_building_cats:
         tmpl += "- 전용면적: \n- 현재업종: \n- 주차대수: \n- 화장실 위치: "
     elif sub_cat == "복수토지":
         tmpl += "- 매각 대상 필지수: \n- 총 면적 합계: \n- 건물 포함 여부: \n- 공부상 지목들: "
-    else: # 순수 토지류
+    else:
         tmpl += "- 용도지역: \n- 지목: \n- 현재이용상태: "
 
     return check_items, tmpl
@@ -91,13 +87,16 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="addr_input")
         
+        # --- [수정 포인트: 토지여도 월세면 입력창 표시] ---
         if main_cat == "토지":
             st.number_input("평단가 (만원)", key="py_price", step=0, format="%d", on_change=calc_values)
-            st.number_input("거래가액 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
+            st.number_input("거래가액/보증금 (만원)", key="land_price", step=0, format="%d", on_change=calc_values)
         else:
             st.number_input("가액/보증금 (만원)", key="land_price", step=0, format="%d")
-            if deal_type == "월세":
-                st.number_input("월세 (만원)", key="monthly_rent", step=0, format="%d")
+            
+        # 대분류 상관없이 '월세'일 때 차임 입력창 표시
+        if deal_type == "월세":
+            st.number_input("월세/차임 (만원)", key="monthly_rent", step=0, format="%d")
 
     with col3:
         area_text = st.text_input("면적 입력", placeholder="예: 100평 또는 330", key="area_input", on_change=calc_values)
@@ -117,7 +116,6 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         checked_str = "\n".join(selected_checks)
         combined_memo = f"{dynamic_tmpl}\n\n[체크사항]\n{checked_str}" if selected_checks else dynamic_tmpl
         
-        # 동적 Key 부여로 입력창 즉시 갱신
         memo_key = f"memo_{sub_cat}_{deal_type}_{len(selected_checks)}"
         memo = st.text_area("특약내용", value=combined_memo, height=200, key=memo_key)
 
@@ -138,5 +136,5 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# --- [매물 필터링 및 목록 관리 (기존 유지)] ---
-# (이후 코드는 이전과 동일하므로 생략 가능하나 전체 코드가 필요하시면 위 내용대로 사용하시면 됩니다)
+# --- [하단 매물 목록 관리 코드는 이전과 동일] ---
+# ... (이후 코드는 동일하므로 생략)
