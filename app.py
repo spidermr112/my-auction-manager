@@ -26,7 +26,6 @@ def get_dynamic_template(sub_cat, deal_type):
             check_items += ["필지별 면적 확인", "건물 포함 여부", "개별매매 불가 명시"]
 
     tmpl = f"[{sub_cat} {deal_type} 상세]\n"
-    # 주거용 & 비주거용 건물일 때 '비밀번호' 항목 추가
     if sub_cat in residential_cats:
         tmpl += "- 비밀번호: \n- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
     elif sub_cat in commercial_building_cats:
@@ -131,54 +130,71 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         }])
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
         st.success(f"[{client_name}]님의 매물이 저장되었습니다!")
-        st.balloons()
         st.rerun()
 
 st.divider()
 
 # --- [매물 필터링 및 목록 관리] ---
-if 'filter_status' not in st.session_state: st.session_state.filter_status = ["진행중", "보류"]
-
-with st.expander("🔍 매물 필터링 / 검색", expanded=True):
+with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1:
-        st.session_state.filter_status = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=st.session_state.filter_status)
+        status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
-        search_input = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
-        if st.button("🔍 검색", use_container_width=True):
-            st.session_state.search_query = search_input
+        search_q = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
 
 df_filtered = st.session_state.df_list.copy()
-df_filtered = df_filtered[df_filtered['상태'].isin(st.session_state.filter_status)]
+df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
 if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
-if st.session_state.search_query:
-    df_filtered = df_filtered[df_filtered['소재지'].str.contains(st.session_state.search_query, na=False)]
+if search_q: df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
 
-st.subheader(f"📋 매물 목록 관리 (조회: {len(df_filtered)}건)")
+st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
+
+# 데이터 에디터 - 표에서는 핵심 수치만 확인
 edited_df = st.data_editor(
     df_filtered,
     use_container_width=True,
-    hide_index=True,
+    hide_index=False, # 행 번호(인덱스)를 보이게 해서 선택 시 참고하도록 함
     num_rows="dynamic", 
     column_config={
         "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        "소분류": st.column_config.TextColumn("📂 소분류"),
-        "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d"),
-        "월세": st.column_config.NumberColumn("💵 월세(만원)", format="%d"),
-        "면적": st.column_config.TextColumn("📏 면적"),
-        "고객명": st.column_config.TextColumn("👤 고객명"),
-        "연락처": st.column_config.TextColumn("📞 연락처"),
-        "접수일": st.column_config.TextColumn("📅 접수일"),
-        "대분류": st.column_config.TextColumn("📁 대분류"),
-        "특약사항": st.column_config.TextColumn("📝 특약사항", width="medium"),
+        "가액": st.column_config.NumberColumn("💰 가액", format="%d"),
+        "월세": st.column_config.NumberColumn("💵 월세", format="%d"),
+        "특약사항": st.column_config.TextColumn("📝 특약(요약)", width="small"), # 표에서는 좁게 설정
     },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "접수일", "대분류", "특약사항"],
+    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "특약사항"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
 
-if st.button("💾 모든 변경 사항 저장", use_container_width=True):
+# 💾 변경사항 저장 버튼
+if st.button("💾 목록 변경 사항 저장", use_container_width=True):
     st.session_state.df_list = edited_df
-    st.toast("목록이 성공적으로 업데이트되었습니다!")
+    st.toast("변경사항이 저장되었습니다.")
+
+# --- [실무 1번 방식: 선택 매물 상세 보기 섹션] ---
+st.markdown("---")
+st.markdown("### 🔍 선택 매물 상세 특약 확인")
+
+if not edited_df.empty:
+    # 모바일에서도 보기 편하게 확장형 UI 제공
+    # 사용자가 표에서 특정 행의 수정 버튼 등을 누르거나 인덱스를 확인할 때 유용합니다.
+    with st.container(border=True):
+        # 표의 가장 최근 데이터(혹은 첫 번째)를 기본으로 보여주고, 
+        # 검색 등을 통해 필터링된 결과 중 하나를 크게 띄웁니다.
+        item_to_show = edited_df.iloc[0] # 실무에서는 선택박스를 추가하여 특정 매물 지정 가능
+        
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            st.info(f"📍 **{item_to_show['소재지']}**")
+            st.write(f"🏷️ **분류:** {item_to_show['소분류']} ({item_to_show['상태']})")
+            st.write(f"📞 **고객:** {item_to_show['고객명']} / {item_to_show['연락처']}")
+            st.success(f"💰 **금액:** {item_to_show['가액']} / {item_to_show['월세']}")
+        
+        with c2:
+            st.markdown("**📜 상세 특약내용 및 비밀번호**")
+            # 텍스트 영역을 크게 배치하여 모바일에서도 읽기 쉽고 복사하기 좋게 함
+            st.text_area("상세내용", value=item_to_show['특약사항'], height=300, label_visibility="collapsed")
+else:
+    st.info("조회된 매물이 없습니다.")
