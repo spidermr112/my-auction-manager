@@ -7,7 +7,7 @@ from google.oauth2.service_account import Credentials
 
 # --- [1. 구글 시트 연결 설정] ---
 # 본인의 구글 스프레드시트 ID를 입력하세요.
-SPREADSHEET_ID = "여기에_구글_시트_ID를_입력하세요"
+SPREADSHEET_ID = "1Ix8kepf4TPK3LXGtkeA_1WzjzJu9DCNwer7bIsStC2g"
 
 # 서비스 계정 JSON 정보
 SERVICE_ACCOUNT_INFO = {
