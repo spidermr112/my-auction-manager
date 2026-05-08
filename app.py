@@ -62,7 +62,7 @@ def calc_values():
     elif py_num > 0 and current_land_price > 0 and current_py_price == 0:
         st.session_state.py_price = int(current_land_price / py_num)
 
-# --- [카테고리 맵: '복수토지'로 명칭 변경] ---
+# --- [카테고리 맵] ---
 category_map = {
     "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
@@ -113,15 +113,16 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         memo = st.text_area("특약내용", value=combined_memo, height=200, key="memo_input")
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
-        new_data = {
+        new_row = pd.DataFrame([{
             "접수일": reg_date.strftime("%Y-%m-%d"),
             "고객명": client_name, "연락처": client_phone,
             "대분류": main_cat, "소분류": sub_cat,
             "가액": st.session_state.land_price, "면적": py_display,
             "상태": "진행중", "소재지": addr
-        }
-        st.session_state.df_list = pd.concat([st.session_state.df_list, pd.DataFrame([new_data])], ignore_index=True)
-        st.success(f"[{client_name}]님의 매물이 성공적으로 등록되었습니다!")
+        }])
+        # --- [수정 포인트: 신규 데이터를 가장 앞에 배치] ---
+        st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
+        st.success(f"[{client_name}]님의 매물이 리스트 최상단에 저장되었습니다!")
         st.balloons()
 
 st.divider()
