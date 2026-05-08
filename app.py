@@ -18,8 +18,10 @@ def get_dynamic_template(sub_cat, deal_type):
     elif sub_cat == "상가/사무실":
         check_items += ["부가세 별도", "권리금 확인", "원상복구", "렌트프리"]
         if deal_type == "월세": check_items += ["전기 용량", "관리비 포함 내역"]
-    elif sub_cat == "대지":
+    elif sub_cat in ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "일괄매각"]: # 토지 관련 전체
         check_items += ["진입로 확인", "지상 적치물", "농취증", "토지거래허가"]
+        if sub_cat == "일괄매각":
+            check_items += ["필지별 면적 확인", "건물 포함 여부", "분할매매 불가 명시"]
 
     # 2. 텍스트 템플릿 정의
     tmpl = f"[{sub_cat} {deal_type} 상세]\n"
@@ -27,6 +29,8 @@ def get_dynamic_template(sub_cat, deal_type):
         tmpl += "- 로열층/방향: \n- 확장유무: \n- 관리비: \n- 입주일: "
     elif sub_cat == "상가/사무실":
         tmpl += "- 전용면적: \n- 현재업종: \n- 주차대수: \n- 화장실 위치: "
+    elif sub_cat == "일괄매각":
+        tmpl += "- 매각 대상 필지수: \n- 총 면적 합계: \n- 건물 포함 여부: \n- 공부상 지목들: "
     else:
         tmpl += "- 용도지역: \n- 지목: \n- 현재이용상태: "
 
@@ -58,10 +62,11 @@ def calc_values():
     elif py_num > 0 and current_land_price > 0 and current_py_price == 0:
         st.session_state.py_price = int(current_land_price / py_num)
 
+# --- [카테고리 맵: '일괄매각' 추가] ---
 category_map = {
     "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"],
-    "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
+    "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "일괄매각"] # 요청사항 반영
 }
 
 # 2. 매물 등록하기
@@ -71,7 +76,6 @@ with st.expander("➕ 매물 등록하기", expanded=True):
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
         purpose = st.radio("의뢰목적", ["매도의뢰", "매수의뢰"], horizontal=True)
-        # --- [고객정보 입력란 추가] ---
         st.markdown("👤 **고객 정보**")
         client_name = st.text_input("고객명", placeholder="이름 입력", key="client_name")
         client_phone = st.text_input("연락처", placeholder="010-0000-0000", key="client_phone")
@@ -93,7 +97,6 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         py_num, py_display = process_area(area_text)
         if area_text: st.info(f"💾 계산 기준 면적: {py_display}")
         
-        # --- [소분류 + 구분에 따른 동적 특약 로직] ---
         st.markdown("**📝 특약 체크리스트**")
         dynamic_checks, dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
         
@@ -123,7 +126,7 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# 3. 매물 필터링 및 목록 관리 (기존 유지)
+# 3. 매물 필터링 및 목록 관리
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1:
