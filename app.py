@@ -6,10 +6,10 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # --- [1. 구글 시트 연결 설정] ---
-# 본인의 구글 스프레드시트 URL 중간에 있는 긴 문자열을 복사해서 넣으세요.
-SPREADSHEET_ID = "1Ix8kepf4TPK3LXGtkeA_1WzjzJu9DCNwer7bIsStC2g"
+# 본인의 구글 스프레드시트 ID를 입력하세요.
+SPREADSHEET_ID = "여기에_구글_시트_ID를_입력하세요"
 
-# 제공해주신 서비스 계정 JSON 정보
+# 서비스 계정 JSON 정보
 SERVICE_ACCOUNT_INFO = {
     "type": "service_account",
     "project_id": "my-property-manager-495705",
@@ -34,28 +34,24 @@ def load_data():
 def save_to_sheet(new_data):
     client = get_gsheet_client()
     sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
-    # 데이터프레임의 값을 리스트로 변환하여 추가
-    sheet.append_row(new_data.iloc[0].tolist())
+    # [핵심 수정] 숫자(int64) 오류 방지를 위해 모든 데이터를 문자열로 변환하여 리스트화
+    row_to_save = new_data.iloc[0].astype(str).tolist()
+    sheet.append_row(row_to_save)
 
-# --- [2. 앱 화면 구성] ---
+# --- [2. 앱 UI 구성] ---
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
 st.title("🏘️ 파크부동산 매물 등록 시스템")
 
-# 데이터 로드
 if 'df_list' not in st.session_state:
     try:
         st.session_state.df_list = load_data()
     except Exception as e:
-        st.error(f"구글 시트 로드 오류: {e}")
         st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
-# 도우미 함수들
+# 도우미 함수
 def get_dynamic_template(sub_cat, deal_type):
-    check_items = ["현 시설 상태", "입주시기 협의"]
-    res_cats = ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"]
-    if sub_cat in res_cats: check_items += ["장기수선충당금", "발코니 확장", "수리 여부"]
     tmpl = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
-    return check_items, tmpl
+    return tmpl
 
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
@@ -71,24 +67,24 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"]
 }
 
-# --- [3. 매물 등록 섹션] ---
-with st.expander("➕ 매물 등록하기", expanded=False):
+# --- [3. 매물 등록] ---
+with st.expander("➕ 매물 등록하기", expanded=True):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
-        client_name = st.text_input("고객명", key="reg_name")
-        client_phone = st.text_input("연락처", key="reg_phone")
+        client_name = st.text_input("고객명")
+        client_phone = st.text_input("연락처")
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
     with col2:
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
-        addr = st.text_input("소재지 상세", key="reg_addr")
-        price = st.number_input("가액 (만원)", step=0)
-        rent = st.number_input("월세 (만원)", step=0) if deal_type == "월세" else 0
+        addr = st.text_input("소재지 상세")
+        price = st.number_input("가액 (만원)", step=100)
+        rent = st.number_input("월세 (만원)", step=10) if deal_type == "월세" else 0
     with col3:
-        area_text = st.text_input("면적 입력", key="reg_area")
+        area_text = st.text_input("면적 입력")
         _, py_display = process_area(area_text)
-        _, dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
+        dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
         memo = st.text_area("특약내용", value=dynamic_tmpl, height=200)
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
@@ -106,19 +102,17 @@ with st.expander("➕ 매물 등록하기", expanded=False):
             "특약사항": memo
         }])
         
-        # 구글 시트에 즉시 저장
         try:
             save_to_sheet(new_row)
-            st.success("구글 시트에 저장되었습니다!")
-            # 상태 업데이트 후 리프레시
-            st.session_state.df_list = load_data()
+            st.success("✅ 성공적으로 저장되었습니다!")
+            st.session_state.df_list = load_data() # 데이터 새로고침
             st.rerun()
         except Exception as e:
             st.error(f"저장 중 오류 발생: {e}")
 
 st.divider()
 
-# --- [4. 조회 및 필터 섹션] ---
+# --- [4. 필터 및 목록] ---
 with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -127,45 +121,34 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=False):
 
 df_filtered = st.session_state.df_list.copy()
 if not df_filtered.empty:
-    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
-    if search_q: 
-        df_filtered = df_filtered[df_filtered['소재지'].astype(str).str.contains(search_q, na=False)]
+    # 필터링 적용
+    if status_list: df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+    if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+    if search_q: df_filtered = df_filtered[df_filtered['소재지'].astype(str).str.contains(search_q, na=False)]
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
 if not df_filtered.empty:
-    # 선택기
-    select_list = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
+    # 선택 박스
+    select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
     target_idx = st.selectbox("🎯 상세 정보를 보려면 매물을 선택하세요", 
-                             options=list(select_list.keys()), 
-                             format_func=lambda x: select_list[x])
+                             options=list(select_options.keys()), 
+                             format_func=lambda x: select_options[x])
 
-    # 데이터 표 (편집 기능은 로컬 session_state만 반영되므로 조회용 권장)
-    st.data_editor(
-        df_filtered,
-        use_container_width=True,
-        hide_index=True,
-        column_config={
-            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-            "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        }
-    )
+    # 표 출력
+    st.data_editor(df_filtered, use_container_width=True, hide_index=True)
 
-    # 상세 정보창
+    # 상세 정보
     item = df_filtered.loc[target_idx]
     st.markdown("---")
-    st.markdown(f"### 🔍 [{item['소재지']}] 상세 정보")
-    
     with st.container(border=True):
+        st.markdown(f"### 🔍 [{item['소재지']}] 상세 정보")
         c1, c2 = st.columns([1, 2])
         with c1:
             st.info(f"📍 **{item['소재지']}**")
-            st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-            st.write(f"📞 **고객:** {item['고객명']} / {item['연락처']}")
-            st.success(f"💰 **가액:** {item['가액']} / {item['월세']}")
+            st.write(f"📞 **고객:** {item['고객명']} ({item['연락처']})")
+            st.write(f"💰 **가액:** {item['가액']} / **월세:** {item['월세']}")
         with c2:
-            st.markdown("**📜 상세 특약 및 메모**")
-            st.text_area("상세내용", value=str(item.get('특약사항', "")), height=300, label_visibility="collapsed", key=f"view_{target_idx}")
+            st.text_area("📜 상세 특약", value=str(item.get('특약사항', "")), height=250)
 else:
     st.info("조회된 매물이 없습니다.")
