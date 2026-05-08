@@ -79,46 +79,48 @@ with st.expander("➕ 매물 등록하기", expanded=True):
 
 st.divider()
 
-# 3. 매물 목록 및 자동 연동 섹션
-st.subheader(f"📋 매물 목록 (총 {len(st.session_state.df_list)}건)")
-st.caption("💡 왼쪽의 체크박스를 선택하면 하단에 상세 내용이 자동으로 나타납니다.")
-
-# [핵심] selection_mode="single_row"를 사용하여 행 선택 가능하게 설정
-event = st.dataframe(
-    st.session_state.df_list,
-    use_container_width=True,
-    hide_index=True,
-    on_select="rerun", # 선택 시 즉시 화면 갱신
-    selection_mode="single_row", 
-    column_config={
-        "상태": "⚙️ 상태",
-        "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        "특약사항": None # 표에서는 숨김 (하단에서 크게 보기 위함)
-    },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
-)
-
-# 4. 하단 상세 연동창
-st.markdown("---")
-st.markdown("### 🔍 선택 매물 상세 특약 확인")
-
-# 선택된 행이 있는지 확인
-selected_rows = event.selection.rows
-
-if selected_rows:
-    # 선택된 행의 인덱스를 통해 데이터를 가져옴
-    idx = selected_rows[0]
-    item = st.session_state.df_list.iloc[idx]
+# 3. 매물 목록 및 안전한 선택 연동 섹션
+if not st.session_state.df_list.empty:
+    st.subheader(f"📋 매물 목록 (총 {len(st.session_state.df_list)}건)")
     
-    with st.container(border=True):
+    # [해결책] 버전 호환을 위해 Selectbox로 상세 매물 선택
+    options = [f"{i}: {row['소재지']} ({row['고객명']})" for i, row in st.session_state.df_list.iterrows()]
+    selected_option = st.selectbox("🔍 상세 내용을 확인할 매물을 선택하세요", options)
+    selected_idx = int(selected_option.split(":")[0])
+
+    # 목록 표시 (편집 가능하도록 data_editor 유지)
+    edited_df = st.data_editor(
+        st.session_state.df_list,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+            "특약사항": None # 표에서는 숨김
+        },
+        column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
+    )
+    
+    if st.button("💾 목록 변경 사항 저장", use_container_width=True):
+        st.session_state.df_list = edited_df
+        st.toast("변경사항이 저장되었습니다.")
+
+    # 4. 하단 상세 연동창
+    st.markdown("---")
+    st.markdown("### 🔍 선택 매물 상세 특약 확인")
+    
+    item = st.session_state.df_list.iloc[selected_idx]
+    
+    with st.container():
         c1, c2 = st.columns([1, 2])
         with c1:
             st.info(f"📍 **{item['소재지']}**")
             st.write(f"🏷️ **분류:** {item['소분류']} ({item['상태']})")
-            st.write(f"👤 **의뢰인:** {item['고객명']} / {item['연락처']}")
+            st.write(f"👤 **의뢰인:** {item['고객명']} ({item['연락처']})")
             st.success(f"💰 **금액:** {item['가액']} / {item['월세']}")
         with c2:
             st.markdown("**📜 상세 특약 및 메모**")
-            st.text_area("상세내용", value=item['특약사항'], height=300, label_visibility="collapsed", key=f"detail_{idx}")
+            memo_val = item.get('특약사항', "내용 없음")
+            st.text_area("상세내용", value=memo_val, height=250, label_visibility="collapsed", key=f"view_{selected_idx}")
 else:
-    st.info("목록에서 매물을 선택(체크)하면 상세 내용이 이곳에 표시됩니다.")
+    st.info("등록된 매물이 없습니다. 매물을 먼저 등록해주세요.")
