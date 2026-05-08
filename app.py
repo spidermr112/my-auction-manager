@@ -104,42 +104,45 @@ with st.expander("➕ 매물 등록하기", expanded=True):
         c_cols = st.columns(2)
         for i, item in enumerate(dynamic_checks):
             with c_cols[i % 2]:
-                if st.checkbox(item, key=f"check_{sub_cat}_{deal_type}_{item}"):
+                # 체크박스 상태 변경 시 즉각 반영을 위해 key에 분류 정보 포함
+                if st.checkbox(item, key=f"cb_{sub_cat}_{deal_type}_{item}"):
                     selected_checks.append(f"✅ {item}")
 
         checked_str = "\n".join(selected_checks)
         combined_memo = f"{dynamic_tmpl}\n\n[체크사항]\n{checked_str}" if selected_checks else dynamic_tmpl
-        memo = st.text_area("특약내용", value=combined_memo, height=200, key="memo_input")
+        
+        # --- [수정 포인트: 동적 Key 부여] ---
+        # 소분류나 구분이 바뀔 때 key를 다르게 주어 텍스트 상자를 강제로 새로고침합니다.
+        memo_key = f"memo_{sub_cat}_{deal_type}_{len(selected_checks)}"
+        memo = st.text_area("특약내용", value=combined_memo, height=200, key=memo_key)
 
     if st.button("🏠 데이터베이스 저장", use_container_width=True):
-        # 1. 새 데이터 생성
         new_row = pd.DataFrame([{
             "접수일": reg_date.strftime("%Y-%m-%d"),
             "고객명": client_name, "연락처": client_phone,
             "대분류": main_cat, "소분류": sub_cat,
             "면적": py_display,
-            "가액": st.session_state.land_price, 
-            "월세": st.session_state.monthly_rent if deal_type == "월세" else 0,
+            "가액": st.session_state.get('land_price', 0), 
+            "월세": st.session_state.get('monthly_rent', 0) if deal_type == "월세" else 0,
             "상태": "진행중", "소재지": addr
         }])
         
-        # 2. 최상단에 저장
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
-        
-        # 3. 알림 표시 후 페이지 초기화
         st.success(f"[{client_name}]님의 매물이 리스트 최상단에 저장되었습니다!")
         st.balloons()
-        
-        # 오류 방지를 위해 값을 직접 대입하지 않고 rerun 호출
         st.rerun()
 
 st.divider()
 
-# 3. 매물 필터링 및 목록 관리
+# --- [하단 매물 목록 관리 (기존 유지)] ---
+# ... (이후 검색 및 데이터 에디터 코드는 이전과 동일)
+df_filtered = st.session_state.df_list.copy()
+if 'filter_status' not in st.session_state: st.session_state.filter_status = ["진행중", "보류"]
+
 with st.expander("🔍 매물 필터링 / 검색", expanded=True):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1:
-        filter_status = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
+        st.session_state.filter_status = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=st.session_state.filter_status)
     with f_col2:
         filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3:
@@ -147,8 +150,7 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=True):
         if st.button("🔍 검색", use_container_width=True):
             st.session_state.search_query = search_input
 
-df_filtered = st.session_state.df_list.copy()
-if filter_status: df_filtered = df_filtered[df_filtered['상태'].isin(filter_status)]
+df_filtered = df_filtered[df_filtered['상태'].isin(st.session_state.filter_status)]
 if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
 if st.session_state.search_query:
     df_filtered = df_filtered[df_filtered['소재지'].str.contains(st.session_state.search_query, na=False)]
