@@ -43,7 +43,8 @@ if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
 if 'df_list' not in st.session_state:
-    st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지"])
+    # 특약사항 열 추가
+    st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
 # --- [유틸리티 함수] ---
 def process_area(input_str):
@@ -125,7 +126,8 @@ with st.expander("➕ 매물 등록하기", expanded=True):
             "면적": py_display,
             "가액": st.session_state.get('land_price', 0), 
             "월세": st.session_state.get('monthly_rent', 0) if deal_type == "월세" else 0,
-            "상태": "진행중", "소재지": addr
+            "상태": "진행중", "소재지": addr,
+            "특약사항": memo # 특약 내용 저장 로직 추가
         }])
         st.session_state.df_list = pd.concat([new_row, st.session_state.df_list], ignore_index=True)
         st.success(f"[{client_name}]님의 매물이 저장되었습니다!")
@@ -161,19 +163,20 @@ edited_df = st.data_editor(
     hide_index=True,
     num_rows="dynamic", 
     column_config={
-        "접수일": st.column_config.TextColumn("📅 접수일"),
-        "고객명": st.column_config.TextColumn("👤 고객명"),
-        "연락처": st.column_config.TextColumn("📞 연락처"),
-        "대분류": st.column_config.TextColumn("📁 대분류"),
-        "소분류": st.column_config.TextColumn("📂 소분류"),
+        "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-        "면적": st.column_config.TextColumn("📏 면적"),
+        "소분류": st.column_config.TextColumn("📂 소분류"),
         "가액": st.column_config.NumberColumn("💰 가액(만원)", format="%d"),
         "월세": st.column_config.NumberColumn("💵 월세(만원)", format="%d"),
-        "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
+        "면적": st.column_config.TextColumn("📏 면적"),
+        "고객명": st.column_config.TextColumn("👤 고객명"),
+        "연락처": st.column_config.TextColumn("📞 연락처"),
+        "접수일": st.column_config.TextColumn("📅 접수일"),
+        "대분류": st.column_config.TextColumn("📁 대분류"),
+        "특약사항": st.column_config.TextColumn("📝 특약사항", width="medium"), # 특약사항 표시 추가
     },
-    # --- [수정 포인트: 소재지 상세를 소분류 뒤로 이동] ---
-    column_order=["접수일", "고객명", "연락처", "대분류", "소분류", "소재지", "면적", "가액", "월세", "상태"],
+    # 실무 최적화 순서 (상태 -> 주소 -> 물건종류 -> 가격)
+    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "접수일", "대분류", "특약사항"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
 
