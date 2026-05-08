@@ -42,6 +42,8 @@ if 'land_price' not in st.session_state: st.session_state.land_price = 0
 if 'py_price' not in st.session_state: st.session_state.py_price = 0
 if 'monthly_rent' not in st.session_state: st.session_state.monthly_rent = 0
 if 'search_query' not in st.session_state: st.session_state.search_query = "" 
+
+# [오류 해결 포인트 1] 데이터프레임 구조에 '특약사항' 명시적 추가
 if 'df_list' not in st.session_state:
     st.session_state.df_list = pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
@@ -145,56 +147,56 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=False):
         search_q = st.text_input("소재지 검색", placeholder="동네 이름이나 주소")
 
 df_filtered = st.session_state.df_list.copy()
-df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-if filter_cat: df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
-if search_q: df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
+# 오류 방지를 위해 열 존재 여부 확인 후 필터링
+if '상태' in df_filtered.columns:
+    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+if '대분류' in df_filtered.columns and filter_cat:
+    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+if '소재지' in df_filtered.columns and search_q:
+    df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
-# 데이터 에디터 - 표에서는 핵심 수치만 확인
 edited_df = st.data_editor(
     df_filtered,
     use_container_width=True,
-    hide_index=False, # 행 번호(인덱스)를 보이게 해서 선택 시 참고하도록 함
+    hide_index=False,
     num_rows="dynamic", 
     column_config={
         "상태": st.column_config.SelectboxColumn("⚙️ 상태", options=["진행중", "완료", "보류", "삭제"], required=True),
         "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
         "가액": st.column_config.NumberColumn("💰 가액", format="%d"),
         "월세": st.column_config.NumberColumn("💵 월세", format="%d"),
-        "특약사항": st.column_config.TextColumn("📝 특약(요약)", width="small"), # 표에서는 좁게 설정
+        "특약사항": st.column_config.TextColumn("📝 특약(요약)", width="small"),
     },
     column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처", "특약사항"],
     disabled=["접수일", "대분류", "소분류", "면적"] 
 )
 
-# 💾 변경사항 저장 버튼
 if st.button("💾 목록 변경 사항 저장", use_container_width=True):
     st.session_state.df_list = edited_df
     st.toast("변경사항이 저장되었습니다.")
 
-# --- [실무 1번 방식: 선택 매물 상세 보기 섹션] ---
+# --- [오류 해결 포인트 2: 안전하게 상세 보기 정보 불러오기] ---
 st.markdown("---")
 st.markdown("### 🔍 선택 매물 상세 특약 확인")
 
 if not edited_df.empty:
-    # 모바일에서도 보기 편하게 확장형 UI 제공
-    # 사용자가 표에서 특정 행의 수정 버튼 등을 누르거나 인덱스를 확인할 때 유용합니다.
     with st.container(border=True):
-        # 표의 가장 최근 데이터(혹은 첫 번째)를 기본으로 보여주고, 
-        # 검색 등을 통해 필터링된 결과 중 하나를 크게 띄웁니다.
-        item_to_show = edited_df.iloc[0] # 실무에서는 선택박스를 추가하여 특정 매물 지정 가능
+        # .iloc[0]으로 행을 가져오되, .get() 메서드를 사용해 열이 없어도 에러 차단
+        item_to_show = edited_df.iloc[0] 
         
         c1, c2 = st.columns([1, 2])
         with c1:
-            st.info(f"📍 **{item_to_show['소재지']}**")
-            st.write(f"🏷️ **분류:** {item_to_show['소분류']} ({item_to_show['상태']})")
-            st.write(f"📞 **고객:** {item_to_show['고객명']} / {item_to_show['연락처']}")
-            st.success(f"💰 **금액:** {item_to_show['가액']} / {item_to_show['월세']}")
+            st.info(f"📍 **{item_to_show.get('소재지', '정보없음')}**")
+            st.write(f"🏷️ **분류:** {item_to_show.get('소분류', '정보없음')} ({item_to_show.get('상태', '정보없음')})")
+            st.write(f"📞 **고객:** {item_to_show.get('고객명', '정보없음')} / {item_to_show.get('연락처', '정보없음')}")
+            st.success(f"💰 **금액:** {item_to_show.get('가액', 0)} / {item_to_show.get('월세', 0)}")
         
         with c2:
             st.markdown("**📜 상세 특약내용 및 비밀번호**")
-            # 텍스트 영역을 크게 배치하여 모바일에서도 읽기 쉽고 복사하기 좋게 함
-            st.text_area("상세내용", value=item_to_show['특약사항'], height=300, label_visibility="collapsed")
+            # 키가 없을 경우 빈 문자열을 반환하도록 설정
+            memo_content = item_to_show.get('특약사항', "저장된 특약 정보가 없습니다.")
+            st.text_area("상세내용", value=memo_content, height=300, label_visibility="collapsed")
 else:
     st.info("조회된 매물이 없습니다.")
