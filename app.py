@@ -6,10 +6,12 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 # --- [1. 구글 시트 연결 설정] ---
-# 본인의 구글 스프레드시트 ID (URL의 d/ 와 /edit 사이 문자열)
+# 본인의 구글 스프레드시트 ID
 SPREADSHEET_ID = "1Ix8kepf4TPK3LXGtkeA_1WzjzJu9DCNwer7bIsStC2g"
 
 # 서비스 계정 JSON 정보
+# [수정 포인트] private_key 문자열 앞에 r을 붙여 원시 문자열로 만들거나, 
+# 실제 개행 문자가 처리될 수 있도록 구성해야 합니다.
 SERVICE_ACCOUNT_INFO = {
     "type": "service_account",
     "project_id": "my-property-manager-495705",
@@ -22,7 +24,12 @@ SERVICE_ACCOUNT_INFO = {
 @st.cache_resource
 def get_gsheet_client():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_info(SERVICE_ACCOUNT_INFO, scopes=scope)
+    
+    # [중요] private_key 내부의 \n 문자열이 실제 개행 문자로 인식되도록 .replace 처리
+    info = SERVICE_ACCOUNT_INFO.copy()
+    info["private_key"] = info["private_key"].replace("\\n", "\n")
+    
+    creds = Credentials.from_service_account_info(info, scopes=scope)
     return gspread.authorize(creds)
 
 def load_data():
@@ -30,6 +37,8 @@ def load_data():
         client = get_gsheet_client()
         sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
         data = sheet.get_all_records()
+        if not data: # 데이터가 아예 없을 경우 빈 프레임 반환
+            return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
         return pd.DataFrame(data)
     except Exception as e:
         st.error(f"구글 시트 데이터를 불러오는데 실패했습니다: {e}")
@@ -38,7 +47,7 @@ def load_data():
 def save_to_sheet(new_data):
     client = get_gsheet_client()
     sheet = client.open_by_key(SPREADSHEET_ID).get_worksheet(0)
-    # [핵심] JSON 직렬화 오류 방지를 위해 모든 데이터를 문자열로 변환하여 전송
+    # 모든 데이터를 문자열로 변환하여 전송
     row_to_save = new_data.iloc[0].astype(str).tolist()
     sheet.append_row(row_to_save)
 
