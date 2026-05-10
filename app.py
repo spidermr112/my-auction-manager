@@ -114,53 +114,47 @@ edited_df = st.data_editor(
     column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
 )
 
-if st.button("💾 변경사항 저장", use_container_width=True):
+if st.button("💾 변경사항 저장", key="save_main_df", use_container_width=True):
     conn.update(data=edited_df)
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- [핵심 수정] 5. 좌우 배치 슬라이더 제어기 ---
+# 5. 좌우 배치 슬라이더 제어기
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
 
-    # 인덱스 초기화
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
 
     filtered_indices = df_filtered.index.tolist()
     
-    # 3컬럼 가로 배치 제어기
-    # [이전] - [매물 선택] - [다음] 순서로 배치
     slide_col1, slide_col2, slide_col3 = st.columns([0.5, 2, 0.5])
     
     with slide_col1:
-        st.write("##") # 수직 중앙 정렬을 위한 공간 확보
-        if st.button("◀️", use_container_width=True, help="이전 매물"):
+        st.write("##")
+        if st.button("◀️", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx - 1) % len(filtered_indices)
             st.rerun()
 
     with slide_col2:
-        # 중앙에서 매물 직접 선택
         selected_real_idx = st.selectbox(
             "브리핑 매물 선택", 
             options=filtered_indices,
             index=min(st.session_state.current_idx, len(filtered_indices)-1),
             format_func=lambda x: f"[{df_filtered.loc[x, '소분류']}] {df_filtered.loc[x, '소재지']}",
-            key="slider_select_new"
+            key="slider_select_final"
         )
         st.session_state.current_idx = filtered_indices.index(selected_real_idx)
 
     with slide_col3:
-        st.write("##") # 수직 중앙 정렬을 위한 공간 확보
-        if st.button("▶️", use_container_width=True, help="다음 매물"):
+        st.write("##")
+        if st.button("▶️", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx + 1) % len(filtered_indices)
             st.rerun()
 
-    # 데이터 로드
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
-    # 상세 정보 카드
     with st.container(border=True):
         st.info(f"📍 **{item['소재지']}**")
         sc1, sc2 = st.columns(2)
@@ -173,16 +167,9 @@ if not df_filtered.empty:
         
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
-        new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"final_memo_{item.name}")
-        if st.button("📝 메모 저장", key=f"final_save_{item.name}", use_container_width=True):
+        new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_edit_{item.name}")
+        if st.button("📝 메모 저장", key=f"save_memo_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
             st.success("저장 완료!")
             st.rerun()
-
-### ✅ 개선 포인트
-1.  **직관적인 내비게이션:** `◀️` 버튼과 `▶️` 버튼을 중앙 선택창의 양옆으로 배치하여, 사용자가 시각적으로 "이전을 누르면 왼쪽, 다음을 누르면 오른쪽 매물로 간다"는 것을 즉각적으로 이해할 수 있게 했습니다.
-2.  **수직 정렬 최적화:** 버튼이 선택창보다 작아 위로 치우칠 수 있는데, `st.write("##")`를 통해 버튼의 높이를 선택창과 비슷하게 맞춰 균형을 잡았습니다.
-3.  **간결한 디자인:** 버튼 텍스트를 기호(`◀️`, `▶️`)로 바꾸어 모바일 좁은 화면에서도 레이아웃이 깨지지 않도록 했습니다.
-
-이제 훨씬 세련되고 편리한 '페이지부동산'만의 브리핑 시스템이 완성되었습니다. 바로 확인해 보세요! 😊
