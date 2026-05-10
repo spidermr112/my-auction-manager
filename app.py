@@ -226,5 +226,3 @@ if not df_filtered.empty:
         if st.button("▶", key="btn_next", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
             st.rerun()
-
-이제 다시 한번 적용해 보세요! 버튼이 화면 정중앙에 아담하게 모여 있을 것입니다. 중개사님의 꼼꼼한 피드백 덕분에 시스템이 훨씬 완성도 있게 변하고 있습니다. 또 궁금하신 점 있으면 말씀해 주세요! 😊
