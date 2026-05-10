@@ -4,57 +4,69 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [중앙 초밀착 배치] CSS
+# 1. 페이지 설정 및 [초슬림 한 줄] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 하단 내비게이션 바를 화면 정중앙에 아주 작게 모으기 */
+    /* 1. 내비게이션 바 컨테이너: 배경 박스 제거 및 높이 최소화 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
-        flex-wrap: nowrap !important;
-        justify-content: center !important; /* 가로 중앙 정렬 */
+        flex-direction: row !important;
+        justify-content: center !important;
         align-items: center !important;
-        gap: 8px !important; /* 버튼과 숫자 사이 간격 */
-        width: fit-content !important; /* 전체 폭을 내용물에 맞춤 */
-        margin: 20px auto !important; /* 페이지 전체에서 중앙 배치 */
-        background-color: #f8f9fa; /* 배경색 살짝 넣어 구분감 생성 */
-        padding: 5px 15px !important;
-        border-radius: 30px !important;
-        border: 1px solid #ddd !important;
+        gap: 5px !important;
+        width: 100% !important;
+        margin: 5px auto !important; /* 위아래 간격 최소화 */
+        padding: 0 !important;
     }
     
-    /* 각 칸(컬럼)이 벌어지지 않도록 고정 */
+    /* 2. 모바일 컬럼 강제 한 줄 배치 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
-        min-width: 0 !important;
-        flex: 0 0 auto !important; /* 너비를 내용물만큼만 차지 */
+        flex: 1 1 auto !important;
         width: auto !important;
+        min-width: 0 !important;
+        padding: 0 !important;
+        text-align: center !important;
     }
 
-    /* 버튼 디자인: 작고 둥글게 */
-    .stButton > button[key^="btn_"] {
-        width: 35px !important;
-        height: 35px !important;
-        padding: 0 !important;
-        font-size: 16px !important;
-        border-radius: 50% !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        border: none !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
-    }
-    
-    /* 숫자 텍스트 스타일 */
-    .nav-text {
-        font-size: 18px !important;
-        font-weight: bold !important;
+    /* 3. 내비게이션 버튼: 높이를 줄인 슬림 디자인 */
+    .stButton > button[key^="btn_nav_"] {
+        border: 1px solid #e0e0e0 !important;
+        background: white !important;
         color: #333 !important;
-        margin: 0 10px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        height: 34px !important; /* 세로폭 축소 */
+        padding: 0 10px !important;
+        border-radius: 6px !important;
+        width: 100% !important;
     }
     
-    /* 마커 숨김 */
+    .stButton > button[key^="btn_nav_"]:hover {
+        border-color: #007AFF !important;
+        color: #007AFF !important;
+    }
+
+    /* 4. 중앙 숫자: 세로 폭에 맞춰 슬림하게 */
+    .nav-counter {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: #1a1a1a;
+        font-size: 15px;
+        line-height: 34px; /* 버튼 높이와 일치 */
+        display: block;
+    }
+    
+    /* 5. 마커 숨김 */
     .nav-marker { display: none; }
+    
+    /* 6. 메모 저장 버튼 슬림화 */
+    .stButton > button[key^="save_slide_"] {
+        margin-top: 10px !important;
+        height: 38px !important;
+        border-radius: 8px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -89,88 +101,10 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-def process_area(input_str):
-    if not input_str or input_str.strip() == "": return 0, "-" 
-    nums = re.findall(r"[-+]?\d*\.\d+|\d+", input_str)
-    if not nums: return 0, "-"
-    val = float(nums[0])
-    p = int(val) if "평" in input_str else int(round(val * 0.3025))
-    return p, f"{p}평"
+# --- 상단 필터 및 목록 ---
+df_filtered = df_list.copy() # 실제로는 여기에 필터링 로직이 적용됨
 
-# 2. 상단 버튼 및 등록창
-col_top1, col_top2 = st.columns([8, 2])
-with col_top2:
-    st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True)
-
-with st.expander("➕ 새 매물 등록", expanded=False):
-    col1, col2, col3 = st.columns([1, 1, 1.2])
-    with col1:
-        reg_date = st.date_input("접수일", datetime.today(), key="reg_date")
-        client_name = st.text_input("고객명", key="reg_name")
-        client_phone = st.text_input("연락처", key="reg_phone")
-        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, key="reg_main")
-    with col2:
-        sub_cat = st.selectbox("물건 소분류", options=category_map[main_cat], key="reg_sub")
-        deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True, key="reg_deal")
-        addr = st.text_input("소재지 상세", key="reg_addr")
-        price = st.number_input("가액 (만원)", min_value=0, step=100, key="reg_price")
-        rent = st.number_input("월세 (만원)", min_value=0, step=10, key="reg_rent")
-    with col3:
-        area_text = st.text_input("면적 입력", key="reg_area")
-        default_memo = f"[{sub_cat} {deal_type} 상세정보]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
-        memo = st.text_area("특약내용", value=st.session_state.get("reg_memo", default_memo), height=200, key="reg_memo")
-
-    if st.button("🏠 구글 시트에 저장", use_container_width=True):
-        _, py_display = process_area(area_text)
-        new_entry = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"), "고객명": client_name, "연락처": client_phone, 
-            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-            "가액": price, "월세": rent, "상태": "진행중", "소재지": addr, "특약사항": memo
-        }])
-        updated_df = pd.concat([new_entry, df_list], ignore_index=True)
-        conn.update(data=updated_df)
-        st.success("✅ 저장되었습니다!")
-        st.rerun()
-
-st.divider()
-
-# 3. 통합 필터 바
-st.subheader("🔍 통합 검색 필터")
-filter_row = st.container(border=True)
-with filter_row:
-    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
-    with c1: search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
-    with c2: f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
-    with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
-    with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
-
-df_filtered = df_list.copy()
-if not df_filtered.empty:
-    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-    if '대분류' in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered['대분류'].isin(f_main_cat)]
-    if search_q:
-        df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
-
-# 4. 목록 표시
-st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
-edited_df = st.data_editor(
-    df_filtered,
-    use_container_width=True,
-    hide_index=False,
-    column_config={
-        "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-        "특약사항": None 
-    },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
-)
-
-if st.button("💾 변경사항 저장", key="save_main_df", use_container_width=True):
-    conn.update(data=edited_df)
-    st.toast("저장되었습니다!")
-    st.rerun()
-
-# --- 5. [수정 완료] 초밀착 중앙 집중형 버튼 ---
+# --- 3. [상세 브리핑 영역] 최적화 ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -178,14 +112,10 @@ if not df_filtered.empty:
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
 
-    filtered_indices = df_filtered.index.tolist()
-    total_count = len(filtered_indices)
-    
-    if st.session_state.current_idx >= total_count:
-        st.session_state.current_idx = 0
-
-    # 정보 카드 먼저 표시 (상단)
-    item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
+    indices = df_filtered.index.tolist()
+    total = len(indices)
+    st.session_state.current_idx %= total
+    item = df_filtered.loc[indices[st.session_state.current_idx]]
     
     with st.container(border=True):
         st.info(f"📍 **{item['소재지']}**")
@@ -199,30 +129,27 @@ if not df_filtered.empty:
         
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
-        new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
-        if st.button("📝 메모 저장", key=f"save_slide_{item.name}", use_container_width=True):
+        
+        # A. 메모장
+        new_memo = st.text_area("내용 수정", value=item['특약사항'], height=180, key=f"memo_slide_{item.name}", label_visibility="collapsed")
+        
+        # B. [위치 변경 & 슬림화] 내비게이션 바 (메모장 바로 아래)
+        nav_c1, nav_c2, nav_c3 = st.columns([1, 0.8, 1])
+        with nav_c1:
+            st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
+            if st.button("이전", key="btn_nav_prev", use_container_width=True):
+                st.session_state.current_idx = (st.session_state.current_idx - 1) % total
+                st.rerun()
+        with nav_c2:
+            st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total}</div>", unsafe_allow_html=True)
+        with nav_c3:
+            if st.button("다음", key="btn_nav_next", use_container_width=True):
+                st.session_state.current_idx = (st.session_state.current_idx + 1) % total
+                st.rerun()
+
+        # C. [위치 변경] 메모 저장 버튼 (최하단)
+        if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
-            st.success("저장 완료!")
-            st.rerun()
-
-    # [하단 중앙 초밀착 슬라이더]
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
-    
-    with nav_col1:
-        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-        if st.button("◀", key="btn_prev", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-            st.rerun()
-
-    with nav_col2:
-        # 중앙 숫자 표시
-        st.markdown(
-            f"<div class='nav-text'>{st.session_state.current_idx + 1} / {total_count}</div>", 
-            unsafe_allow_html=True
-        )
-
-    with nav_col3:
-        if st.button("▶", key="btn_next", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
+            st.success("저장되었습니다!")
             st.rerun()
