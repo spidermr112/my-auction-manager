@@ -9,16 +9,29 @@ st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wi
 st.title("🏘️ 부동산 매물 등록 시스템 (클라우드 연동)")
 
 # --- [연결] 구글 스프레드시트 연결 ---
-# secrets.toml에 설정된 정보를 바탕으로 연결합니다.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
-    """구글 시트에서 데이터를 불러옵니다."""
+    """구글 시트에서 데이터를 불러오고 형식을 정제합니다."""
     try:
-        # 시트의 데이터를 읽어오되, 캐시를 0으로 설정하여 항상 최신 데이터를 가져옵니다.
-        return conn.read(ttl=0)
-    except Exception:
-        # 시트가 비어있거나 오류 발생 시 기본 컬럼 생성
+        # 데이터 로드 (ttl=0으로 설정하여 캐시 없이 실시간 반영)
+        data = conn.read(ttl=0)
+        
+        # [오류 해결 핵심] 1. 전체 데이터의 빈 값(NaN)을 적절히 처리
+        data = data.dropna(how='all') # 완전히 비어있는 행 삭제
+        data = data.fillna("")        # 남은 빈 칸은 빈 문자열로 채움
+        
+        # [오류 해결 핵심] 2. 숫자 컬럼 강제 변환 (가액, 월세 등)
+        # 문자열이나 NaN이 섞여있으면 st.data_editor에서 오류가 발생함
+        num_cols = ["가액", "월세"]
+        for col in num_cols:
+            if col in data.columns:
+                # 숫자로 변환하되, 변환 안되는 값은 0으로 처리
+                data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0).astype(int)
+        
+        return data
+    except Exception as e:
+        # 시트가 아예 비어있거나 연결 오류 시 기본 틀 반환
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
 # 데이터 로드
@@ -72,11 +85,9 @@ with st.expander("➕ 매물 등록하기", expanded=False):
             "소재지": addr, "특약사항": memo
         }])
         
-        # 기존 데이터와 합치기
         updated_df = pd.concat([new_entry, df_list], ignore_index=True)
-        # 구글 시트 업데이트
         conn.update(data=updated_df)
-        st.success("매물이 구글 시트에 동기화되었습니다!")
+        st.success("매물이 구글 시트에 성공적으로 등록되었습니다!")
         st.rerun()
 
 st.divider()
@@ -88,21 +99,27 @@ with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     with f_col2: filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3: search_q = st.text_input("소재지 검색")
 
+# 필터링 적용
 df_filtered = df_list.copy()
 if not df_filtered.empty:
-    df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-    df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
-    if search_q: 
+    # 상태와 대분류 필터링 (데이터가 있을 때만)
+    if '상태' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+    if '대분류' in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered['대분류'].isin(filter_cat)]
+    if search_q and '소재지' in df_filtered.columns: 
         df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False)]
 
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
 if not df_filtered.empty:
+    # 선택 상자 (오류 방지를 위해 소재지가 비어있지 않은 데이터만 매핑)
     select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
     target_idx = st.selectbox("🎯 상세 정보를 보려면 매물을 선택하세요", 
                              options=list(select_options.keys()), 
                              format_func=lambda x: select_options[x])
 
+    # 데이터 편집기
     edited_df = st.data_editor(
         df_filtered,
         use_container_width=True,
@@ -110,15 +127,16 @@ if not df_filtered.empty:
         column_config={
             "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
             "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
+            "특약사항": None # 목록에서는 숨김
         },
         column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
     )
 
     if st.button("💾 변경 사항 구글 시트 반영", use_container_width=True):
-        # 편집된 데이터를 원본 데이터프레임의 인덱스에 맞춰 업데이트
+        # 전체 리스트에서 편집된 내용만 업데이트
         df_list.update(edited_df)
         conn.update(data=df_list)
-        st.toast("구글 시트 업데이트 완료!")
+        st.toast("구글 시트 업데이트가 완료되었습니다!")
         st.rerun()
 
     # 4. 하단 상세 정보창
@@ -139,7 +157,7 @@ if not df_filtered.empty:
             if st.button("📝 특약사항만 즉시 저장"):
                 df_list.at[target_idx, '특약사항'] = updated_memo
                 conn.update(data=df_list)
-                st.success("구글 시트에 특약사항이 반영되었습니다.")
+                st.success("특약사항이 구글 시트에 저장되었습니다.")
                 st.rerun()
 else:
-    st.info("조회된 매물이 없습니다.")
+    st.info("조회된 매물이 없습니다. 매물을 먼저 등록해 주세요.")
