@@ -4,32 +4,32 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [디자인 복구 + 한 줄 센터 고정] CSS
+# 1. 페이지 설정 및 [모바일 한 줄 고정] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 내비게이션 바: 이전 1/8 다음을 한 줄로 강제 고정 */
+    /* 핵심: 모바일에서도 버튼이 절대 밑으로 떨어지지 않게 강제 고정 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
-        flex-direction: row !important; /* 모바일에서도 가로 유지 */
-        justify-content: center !important; /* 중앙 정렬 */
+        flex-direction: row !important;
+        flex-wrap: nowrap !important; /* 이 코드가 버튼이 밑으로 안 떨어지게 막아줍니다 */
+        justify-content: center !important;
         align-items: center !important;
-        gap: 5px !important;
+        gap: 8px !important;
         width: 100% !important;
         margin: 10px 0 !important;
-        padding: 0 !important;
     }
     
-    /* 2. 각 컬럼(이전, 숫자, 다음)의 너비를 내용만큼만 차지하게 조절 */
+    /* 각 컬럼의 너비를 최소화하여 버튼들을 중앙으로 밀착 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
-        flex: 0 0 auto !important;
+        flex: 0 1 auto !important;
         width: auto !important;
         min-width: 0 !important;
         padding: 0 !important;
     }
 
-    /* 3. 버튼 디자인: 이전의 깔끔하고 신뢰감 있는 사각형 스타일 */
+    /* 버튼 디자인: 이전의 깔끔한 사각형 스타일 유지 */
     .stButton > button[key^="btn_nav_"] {
         border: 1px solid #d1d5db !important;
         background-color: white !important;
@@ -37,24 +37,25 @@ st.markdown("""
         font-weight: 600 !important;
         font-size: 14px !important;
         height: 38px !important;
-        padding: 0 15px !important;
+        padding: 0 12px !important;
         border-radius: 6px !important;
         box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
+        white-space: nowrap !important; /* 버튼 글자 줄바꿈 방지 */
     }
     
-    /* 4. 중앙 숫자: 버튼 높이와 맞춰서 정렬 */
+    /* 중앙 숫자 디자인 */
     .nav-counter {
         font-size: 16px !important;
         font-weight: 700 !important;
         color: #111827 !important;
         line-height: 38px;
-        padding: 0 10px;
-        text-align: center;
+        padding: 0 5px;
+        white-space: nowrap !important;
     }
     
     .nav-marker { display: none; }
 
-    /* 5. 하단 저장 버튼 */
+    /* 저장 버튼 디자인 */
     .stButton > button[key^="save_slide_"] {
         height: 45px !important;
         border-radius: 8px !important;
@@ -176,7 +177,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. 상세 브리핑 영역 (순서 최적화) ---
+# --- 5. 상세 브리핑 영역 (모바일 최적화) ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -205,7 +206,7 @@ if not df_filtered.empty:
         # 5-1. 메모장
         new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
         
-        # 5-2. [한 줄 고정] 내비게이션 바
+        # 5-2. [모바일 한 줄 고정] 내비게이션 바
         n_col1, n_col2, n_col3 = st.columns([1, 1, 1])
         with n_col1:
             st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
