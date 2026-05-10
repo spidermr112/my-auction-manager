@@ -4,72 +4,57 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [상단 이동 + 밸런스 UI] CSS
+# 1. 페이지 설정 및 [중앙 초밀착 배치] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 컨트롤러 바 (상단 이동용 디자인) */
+    /* 하단 내비게이션 바를 화면 정중앙에 아주 작게 모으기 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-wrap: nowrap !important;
-        justify-content: center !important;
+        justify-content: center !important; /* 가로 중앙 정렬 */
         align-items: center !important;
-        gap: 10px !important;
-        width: fit-content !important;
-        margin: 10px auto 20px auto !important; /* 상단 여백 최소화, 하단 여백 확보 */
-        background-color: #f0f2f6 !important; /* 연한 블루 그레이 배경 */
-        padding: 8px 20px !important;
-        border-radius: 50px !important;
-        border: 1px solid #d1d5db !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+        gap: 8px !important; /* 버튼과 숫자 사이 간격 */
+        width: fit-content !important; /* 전체 폭을 내용물에 맞춤 */
+        margin: 20px auto !important; /* 페이지 전체에서 중앙 배치 */
+        background-color: #f8f9fa; /* 배경색 살짝 넣어 구분감 생성 */
+        padding: 5px 15px !important;
+        border-radius: 30px !important;
+        border: 1px solid #ddd !important;
     }
     
-    /* 각 컬럼 너비 고정 */
+    /* 각 칸(컬럼)이 벌어지지 않도록 고정 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
         min-width: 0 !important;
-        flex: 0 0 auto !important;
+        flex: 0 0 auto !important; /* 너비를 내용물만큼만 차지 */
         width: auto !important;
     }
 
-    /* 버튼 스타일: 밸런스 잡힌 원형 버튼 */
-    .stButton > button[key^="btn_nav_"] {
-        width: 38px !important;
-        height: 38px !important;
+    /* 버튼 디자인: 작고 둥글게 */
+    .stButton > button[key^="btn_"] {
+        width: 35px !important;
+        height: 35px !important;
         padding: 0 !important;
         font-size: 16px !important;
         border-radius: 50% !important;
-        border: 1px solid #d1d5db !important;
-        background-color: white !important;
-        color: #333 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: all 0.2s !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }
     
-    .stButton > button[key^="btn_nav_"]:hover {
-        border-color: #005088 !important;
-        color: #005088 !important;
-        background-color: #f8fafc !important;
-    }
-
-    /* 숫자 카운트 텍스트 */
-    .nav-counter {
+    /* 숫자 텍스트 스타일 */
+    .nav-text {
         font-size: 18px !important;
-        font-weight: 700 !important;
-        color: #005088 !important;
-        margin: 0 15px !important;
-        font-family: 'monospace' !important;
+        font-weight: bold !important;
+        color: #333 !important;
+        margin: 0 10px !important;
     }
     
     /* 마커 숨김 */
     .nav-marker { display: none; }
-    
-    /* 카드 정보 가독성 향상 */
-    .prop-info-box {
-        margin-top: 0 !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -185,7 +170,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. [최종 완성형] 상단 배치 내비게이션 + 정보 카드 ---
+# --- 5. [수정 완료] 초밀착 중앙 집중형 버튼 ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -199,34 +184,14 @@ if not df_filtered.empty:
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
-    # 5-1. 상단 내비게이션 버튼 (정보 카드 위로 이동)
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
-    
-    with nav_col1:
-        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-        if st.button("◀", key="btn_nav_prev", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-            st.rerun()
-
-    with nav_col2:
-        st.markdown(
-            f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", 
-            unsafe_allow_html=True
-        )
-
-    with nav_col3:
-        if st.button("▶", key="btn_nav_next", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
-            st.rerun()
-
-    # 5-2. 정보 카드 (내비게이션 아래에 배치)
+    # 정보 카드 먼저 표시 (상단)
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
         st.info(f"📍 **{item['소재지']}**")
         sc1, sc2 = st.columns(2)
         with sc1:
-            st.write(f"🏠 **종류:** {item['소분류']} ({item['상태']})")
+            st.write(f"🏠 **분류:** {item['소분류']} ({item['상태']})")
             st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
         with sc2:
             st.write(f"📏 **면적:** {item['면적']}")
@@ -239,4 +204,25 @@ if not df_filtered.empty:
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
             st.success("저장 완료!")
+            st.rerun()
+
+    # [하단 중앙 초밀착 슬라이더]
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+    
+    with nav_col1:
+        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
+        if st.button("◀", key="btn_prev", use_container_width=True):
+            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
+            st.rerun()
+
+    with nav_col2:
+        # 중앙 숫자 표시
+        st.markdown(
+            f"<div class='nav-text'>{st.session_state.current_idx + 1} / {total_count}</div>", 
+            unsafe_allow_html=True
+        )
+
+    with nav_col3:
+        if st.button("▶", key="btn_next", use_container_width=True):
+            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
             st.rerun()
