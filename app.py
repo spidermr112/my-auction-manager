@@ -23,18 +23,21 @@ def load_data():
     except Exception:
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
+# 데이터 로드
 df_list = load_data()
 
-# --- [함수] 입력값 초기화 로직 ---
-def reset_input_fields():
-    """저장 성공 후 입력 필드들을 초기화합니다."""
+# --- [핵심] 입력 필드 초기화 함수 ---
+def clear_inputs():
+    """입력 필드에 연결된 세션 상태를 직접 초기화합니다."""
+    # 위젯에 연결된 key들을 초기화 (이 기능은 rerun 없이도 값만 비워줍니다)
     st.session_state["reg_name"] = ""
     st.session_state["reg_phone"] = ""
     st.session_state["reg_addr"] = ""
     st.session_state["reg_area"] = ""
     st.session_state["reg_price"] = 0
     st.session_state["reg_rent"] = 0
-    # 특약내용은 함수 내부에서 template을 다시 불러오므로 여기서는 초기화 생략 가능
+    # 메모는 기본 템플릿으로 복구하거나 비웁니다.
+    st.session_state["reg_memo"] = ""
 
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
@@ -55,7 +58,7 @@ with st.expander("➕ 새 매물 등록", expanded=False):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
-        # key값을 부여하여 세션 상태에서 관리합니다.
+        # 위젯에 key를 부여하면 st.session_state[key]로 접근 가능합니다.
         client_name = st.text_input("고객명", key="reg_name")
         client_phone = st.text_input("연락처", key="reg_phone")
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
@@ -68,12 +71,16 @@ with st.expander("➕ 새 매물 등록", expanded=False):
     with col3:
         area_text = st.text_input("면적 입력", key="reg_area")
         _, py_display = process_area(area_text)
-        # 템플릿 생성
-        dynamic_tmpl = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
-        memo = st.text_area("특약내용", value=dynamic_tmpl, height=200, key="reg_memo")
+        
+        # 특약내용 초기 템플릿 설정 (session_state에 값이 없을 때만)
+        if "reg_memo" not in st.session_state or st.session_state["reg_memo"] == "":
+            st.session_state["reg_memo"] = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
+            
+        memo = st.text_area("특약내용", height=200, key="reg_memo")
 
+    # 저장 로직
     if st.button("🏠 구글 시트에 저장", use_container_width=True):
-        if client_name and addr: # 최소한의 필수값 확인
+        if client_name and addr:
             new_entry = pd.DataFrame([{
                 "접수일": reg_date.strftime("%Y-%m-%d"), 
                 "고객명": client_name, "연락처": client_phone, 
@@ -82,20 +89,26 @@ with st.expander("➕ 새 매물 등록", expanded=False):
                 "소재지": addr, "특약사항": memo
             }])
             
+            # 구글 시트 업데이트
             updated_df = pd.concat([new_entry, df_list], ignore_index=True)
             conn.update(data=updated_df)
             
-            # [핵심] 저장 후 초기화 함수 실행
-            reset_input_fields()
+            # [수정된 부분] 강제로 모든 값을 비우고 화면을 완전히 새로고침합니다.
+            st.success("저장 완료! 입력창을 초기화합니다.")
             
-            st.success("매물이 성공적으로 저장되었습니다! 입력창이 초기화되었습니다.")
-            st.rerun() # 화면을 새로고침하여 초기화된 값을 반영
+            # 세션 스테이트를 완전히 비우는 방식 (가장 안전)
+            for key in ["reg_name", "reg_phone", "reg_addr", "reg_area", "reg_price", "reg_rent", "reg_memo"]:
+                if key in st.session_state:
+                    del st.session_state[key]
+            
+            st.rerun() # 앱을 처음부터 다시 실행하여 모든 위젯을 깨끗하게 만듦
         else:
-            st.warning("고객명과 소재지는 필수 입력 사항입니다.")
+            st.error("고객명과 소재지를 입력해주세요!")
 
 st.divider()
 
-# 3. 매물 필터링 및 목록 (기존과 동일)
+# --- 이하 목록 및 상세정보 코드는 기존과 동일 ---
+# (공간 절약을 위해 생략하지만, 실제 파일에는 그대로 유지하시면 됩니다)
 with st.expander("🔍 매물 검색 및 필터", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -136,7 +149,6 @@ if not df_filtered.empty:
         st.toast("구글 시트 업데이트 완료!")
         st.rerun()
 
-    # 4. 하단 상세 정보창 (기존과 동일)
     st.markdown("---")
     item = df_filtered.loc[target_idx]
     st.markdown(f"### 🔍 [{item['소재지']}] 상세 정보")
