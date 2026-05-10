@@ -4,20 +4,24 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [핵심] 모바일 줄바꿈 방지 CSS
+# 1. 페이지 설정 및 모바일 하단 중앙 정렬 CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* nav-marker가 포함된 구역은 폰에서도 '절대' 줄바꿈(세로 배치) 되지 않도록 강제 고정 */
+    /* 하단 내비게이션 바 중앙 정렬 및 너비 축소 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
+        display: flex !important;
         flex-wrap: nowrap !important;
         flex-direction: row !important;
+        justify-content: center !important;
         align-items: center !important;
-        gap: 10px !important; /* 버튼 사이 여백 축소 */
+        gap: 8px !important;
+        max-width: 320px !important; /* 폰 화면에서 너무 넓어지지 않게 폭 제한 */
+        margin: 15px auto 0 auto !important; /* 가운데 정렬 및 위쪽 여백 */
     }
     
-    /* 3개의 칸이 화면 비율에 맞춰 쪼그라들도록 설정 */
+    /* 각 버튼과 숫자 칸의 크기 조절 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
         min-width: 0 !important;
         width: auto !important;
@@ -25,9 +29,8 @@ st.markdown("""
         padding: 0 !important;
     }
     
-    /* 가운데 숫자 부분은 약간 더 넓게 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"]:nth-child(2) {
-        flex: 1.5 1 0px !important;
+        flex: 1.2 1 0px !important; /* 숫자 부분을 약간만 더 넓게 */
     }
     
     /* 마커 숨김 */
@@ -147,7 +150,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. [수정 완료] 강제 가로 배치 슬라이더 ---
+# --- 5. [수정 완료] 매물 정보 먼저 출력 후 하단에 콤팩트 버튼 배치 ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -161,30 +164,7 @@ if not df_filtered.empty:
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
-    # 3개의 컬럼을 만들되, 위의 CSS가 적용되도록 마커를 삽입합니다.
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 1.5, 1])
-    
-    with nav_col1:
-        # 이 마커(nav-marker)가 핵심입니다. CSS가 이 마커를 보고 가로 배치를 강제합니다.
-        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-        if st.button("◀ 이전", use_container_width=True, key="btn_prev"):
-            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-            st.rerun()
-
-    with nav_col2:
-        # 디자인을 더 세련되고 콤팩트하게 다듬었습니다.
-        st.markdown(
-            f"<h3 style='text-align: center; margin: 0; padding-top: 5px; font-size: 24px;'>"
-            f"{st.session_state.current_idx + 1} <span style='font-size: 16px; color: #888;'>/ {total_count}</span>"
-            f"</h3>", 
-            unsafe_allow_html=True
-        )
-
-    with nav_col3:
-        if st.button("다음 ▶", use_container_width=True, key="btn_next"):
-            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
-            st.rerun()
-
+    # 5-1. 정보 카드 먼저 표시 (화면 상단)
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
@@ -199,9 +179,33 @@ if not df_filtered.empty:
         
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
+        
+        # 텍스트 박스 높이를 고정하여 페이지가 위아래로 널뛰기 하는 것을 방지
         new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
         if st.button("📝 메모 저장", key=f"save_slide_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
             st.success("저장 완료!")
+            st.rerun()
+
+    # 5-2. 슬라이더 버튼 (화면 하단 중앙에 아담하게 배치)
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1.2, 1])
+    
+    with nav_col1:
+        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
+        if st.button("◀ 이전", use_container_width=True, key="btn_prev"):
+            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
+            st.rerun()
+
+    with nav_col2:
+        st.markdown(
+            f"<h3 style='text-align: center; margin: 0; padding-top: 5px; font-size: 22px;'>"
+            f"{st.session_state.current_idx + 1} <span style='font-size: 15px; color: #888;'>/ {total_count}</span>"
+            f"</h3>", 
+            unsafe_allow_html=True
+        )
+
+    with nav_col3:
+        if st.button("다음 ▶", use_container_width=True, key="btn_next"):
+            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
             st.rerun()
