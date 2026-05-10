@@ -25,13 +25,11 @@ def load_data():
 
 df_list = load_data()
 
-# --- [기능 1] 초기화 버튼 (입력창 + 필터 모두 초기화) ---
+# --- 초기화 기능 ---
 def reset_all():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
     st.rerun()
-
-st.button("🔄 전체 초기화 (입력창 비우기 및 필터 해제)", on_click=reset_all, use_container_width=True)
 
 # [카테고리 맵]
 category_map = {
@@ -48,7 +46,11 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-# 2. 매물 등록하기
+# 2. 상단 버튼 및 등록창
+col_top1, col_top2 = st.columns([8, 2])
+with col_top2:
+    st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True)
+
 with st.expander("➕ 새 매물 등록", expanded=False):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
@@ -81,85 +83,75 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
 st.divider()
 
-# --- [핵심 수정] 다중 필터 시스템 ---
-st.subheader("🔍 매물 통합 검색")
+# --- [핵심 수정] 통합 필터 바 (한 줄 배치) ---
+st.subheader("🔍 통합 검색 필터")
 
-# 필터 영역을 3컬럼으로 배치
-f_col1, f_col2, f_col3 = st.columns([1.5, 1, 1])
+# 검색창과 3가지 필터를 한 줄(4컬럼)로 구성
+filter_row = st.container(border=True)
+with filter_row:
+    c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+    
+    with c1:
+        search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
+    with c2:
+        f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
+    with c3:
+        f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
+    with c4:
+        status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
 
-with f_col1:
-    search_q = st.text_input("📍 소재지 또는 고객명 검색", placeholder="주소나 이름을 입력하세요")
-
-with f_col2:
-    # 대분류 필터 (주거용, 비주거용, 토지)
-    f_main_cat = st.multiselect("🏗️ 매물 종류", options=list(category_map.keys()), default=list(category_map.keys()))
-
-with f_col3:
-    # 거래 방식 필터 (매매, 전세, 월세)
-    # 구글 시트에 '구분'이라는 컬럼이 없다면 '특약사항'이나 다른 곳에서 찾아야 하므로 
-    # 데이터 구조에 '구분' 컬럼이 저장되도록 위 저장 로직에도 반영했습니다.
-    f_deal_type = st.multiselect("💰 거래 구분", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"])
-
-# 상태 필터는 눈에 잘 띄게 바로 아래 넓게 배치
-status_list = st.multiselect("🚦 상태 필터", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
-
-# 필터링 로직 적용
+# 필터링 적용
 df_filtered = df_list.copy()
 if not df_filtered.empty:
-    # 1. 상태 필터
     df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-    # 2. 대분류 필터
     if '대분류' in df_filtered.columns:
         df_filtered = df_filtered[df_filtered['대분류'].isin(f_main_cat)]
-    # 3. 텍스트 검색 (소재지 또는 고객명)
+    # 거래 구분이 데이터에 명시적으로 없더라도 검색어나 특약사항 기반으로 필터링 가능하지만, 
+    # 여기서는 '구분'이라는 값이 저장된다고 가정합니다.
     if search_q:
         df_filtered = df_filtered[
             df_filtered['소재지'].str.contains(search_q, na=False) | 
             df_filtered['고객명'].str.contains(search_q, na=False)
         ]
 
-# 4. 목록 표시 및 에디터
-st.subheader(f"📋 검색 결과 ({len(df_filtered)}건)")
+# 4. 목록 표시
+st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
 edited_df = st.data_editor(
     df_filtered,
     use_container_width=True,
     hide_index=False,
     column_config={
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-        "특약사항": None # 표에서는 숨김
+        "특약사항": None 
     },
     column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
 )
 
-if st.button("💾 변경사항 시트 반영", use_container_width=True):
+if st.button("💾 변경사항 저장", use_container_width=True):
     conn.update(data=edited_df)
-    st.toast("변경사항이 저장되었습니다!")
+    st.toast("저장되었습니다!")
     st.rerun()
 
 # 5. 상세 브리핑 카드
-st.markdown("---")
 if not df_filtered.empty:
-    st.subheader("📋 매물 상세 브리핑 카드")
-    property_options = {i: f"[{row['소분류']}] {row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
-    selected_idx = st.selectbox("🎯 확인할 매물을 선택하세요", options=list(property_options.keys()), format_func=lambda x: property_options[x])
+    st.markdown("---")
+    st.subheader("📋 선택 매물 상세 정보")
+    property_options = {i: f"[{row['소분류']}] {row['소재지']}" for i, row in df_filtered.iterrows()}
+    selected_idx = st.selectbox("🎯 상세 내용을 확인할 매물을 선택하세요", options=list(property_options.keys()), format_func=lambda x: property_options[x])
 
     if selected_idx is not None:
         item = df_filtered.loc[selected_idx]
         with st.container(border=True):
-            c1, c2 = st.columns([1.5, 2.5])
-            with c1:
-                st.markdown(f"### 📍 {item['소재지']}")
-                st.markdown(f"**🏠 분류:** {item['대분류']} > {item['소분류']} ({item['상태']})")
-                st.markdown(f"**💰 가격:** {item['가액']} / {item['월세']}")
-                st.markdown(f"**📏 면적:** {item['면적']}")
-                st.markdown(f"**👤 고객:** {item['고객명']} ({item['연락처']})")
-            with c2:
-                st.markdown("**📜 상세 특약 및 메모**")
-                new_memo = st.text_area("메모 수정", value=item['특약사항'], height=200, key=f"edit_memo_{selected_idx}")
-                if st.button("📝 메모만 즉시 저장"):
+            sc1, sc2 = st.columns([1, 2])
+            with sc1:
+                st.info(f"**📍 {item['소재지']}**")
+                st.write(f"🏠 {item['대분류']} > {item['소분류']}")
+                st.write(f"💰 {item['가액']} / {item['월세']} ({item['면적']})")
+                st.write(f"👤 {item['고객명']} ({item['연락처']})")
+            with sc2:
+                new_memo = st.text_area("메모 수정", value=item['특약사항'], height=150, key=f"m_{selected_idx}")
+                if st.button("📝 메모 저장"):
                     df_list.at[selected_idx, '특약사항'] = new_memo
                     conn.update(data=df_list)
-                    st.success("메모가 수정되었습니다.")
+                    st.success("수정되었습니다.")
                     st.rerun()
-else:
-    st.info("조건에 맞는 매물이 없습니다.")
