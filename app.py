@@ -4,33 +4,53 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 버튼 중앙 집중 CSS
+# 1. 페이지 설정 및 [중앙 초밀착 배치] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 하단 내비게이션 바를 중앙으로 좁게 모으기 */
+    /* 하단 내비게이션 바를 화면 정중앙에 아주 작게 모으기 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-wrap: nowrap !important;
-        justify-content: center !important; /* 가운데 정렬 */
+        justify-content: center !important; /* 가로 중앙 정렬 */
         align-items: center !important;
-        gap: 5px !important; /* 버튼 사이 간격을 아주 좁게 */
-        max-width: 250px !important; /* 전체 폭을 더 줄임 */
-        margin: 20px auto !important; /* 페이지 중앙 정렬 */
+        gap: 8px !important; /* 버튼과 숫자 사이 간격 */
+        width: fit-content !important; /* 전체 폭을 내용물에 맞춤 */
+        margin: 20px auto !important; /* 페이지 전체에서 중앙 배치 */
+        background-color: #f8f9fa; /* 배경색 살짝 넣어 구분감 생성 */
+        padding: 5px 15px !important;
+        border-radius: 30px !important;
+        border: 1px solid #ddd !important;
     }
     
-    /* 각 칸의 너비를 버튼 크기에 맞게 최소화 */
+    /* 각 칸(컬럼)이 벌어지지 않도록 고정 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
         min-width: 0 !important;
-        flex: 0 1 auto !important; /* 내용만큼만 너비 차지 */
+        flex: 0 0 auto !important; /* 너비를 내용물만큼만 차지 */
+        width: auto !important;
     }
 
-    /* 버튼 스타일: 크기를 줄이고 둥글게 */
+    /* 버튼 디자인: 작고 둥글게 */
     .stButton > button[key^="btn_"] {
-        padding: 5px 15px !important;
-        font-size: 14px !important;
-        border-radius: 20px !important;
+        width: 35px !important;
+        height: 35px !important;
+        padding: 0 !important;
+        font-size: 16px !important;
+        border-radius: 50% !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* 숫자 텍스트 스타일 */
+    .nav-text {
+        font-size: 18px !important;
+        font-weight: bold !important;
+        color: #333 !important;
+        margin: 0 10px !important;
     }
     
     /* 마커 숨김 */
@@ -150,7 +170,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. [수정] 중앙으로 몰린 하단 콤팩트 버튼 ---
+# --- 5. [수정 완료] 초밀착 중앙 집중형 버튼 ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -164,7 +184,7 @@ if not df_filtered.empty:
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
-    # 정보 카드 표시
+    # 정보 카드 먼저 표시 (상단)
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
@@ -186,25 +206,25 @@ if not df_filtered.empty:
             st.success("저장 완료!")
             st.rerun()
 
-    # [중앙 집중형 슬라이더] 
-    # 버튼 폭을 줄이기 위해 컬럼 비율을 [1, 1, 1]로 조정하고 CSS로 한 번 더 좁혔습니다.
-    n_col1, n_col2, n_col3 = st.columns([1, 1, 1])
+    # [하단 중앙 초밀착 슬라이더]
+    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
     
-    with n_col1:
+    with nav_col1:
         st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
         if st.button("◀", key="btn_prev", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
             st.rerun()
 
-    with n_col2:
+    with nav_col2:
+        # 중앙 숫자 표시
         st.markdown(
-            f"<p style='text-align: center; font-size: 18px; font-weight: bold; margin-top: 5px; white-space: nowrap;'>"
-            f"{st.session_state.current_idx + 1} / {total_count}"
-            f"</p>", 
+            f"<div class='nav-text'>{st.session_state.current_idx + 1} / {total_count}</div>", 
             unsafe_allow_html=True
         )
 
-    with n_col3:
+    with nav_col3:
         if st.button("▶", key="btn_next", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
             st.rerun()
+
+이제 다시 한번 적용해 보세요! 버튼이 화면 정중앙에 아담하게 모여 있을 것입니다. 중개사님의 꼼꼼한 피드백 덕분에 시스템이 훨씬 완성도 있게 변하고 있습니다. 또 궁금하신 점 있으면 말씀해 주세요! 😊
