@@ -4,39 +4,37 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 (이름만 변경)
+# 1. 페이지 설정
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
-
-# 메인 타이틀 수정
 st.title("📄 페이지부동산 매물 관리 시스템")
 
 # --- [연결] 구글 스프레드시트 연결 ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
-    """구글 시트에서 데이터를 불러오고 형식을 정제합니다."""
     try:
         data = conn.read(ttl=0)
-        data = data.dropna(how='all')
-        data = data.fillna("")
-        
-        # 숫자 컬럼 강제 변환
+        data = data.dropna(how='all').fillna("")
         num_cols = ["가액", "월세"]
         for col in num_cols:
             if col in data.columns:
                 data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0).astype(int)
-        
         return data
-    except Exception as e:
+    except Exception:
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
-# 데이터 로드
 df_list = load_data()
 
-# --- [함수] 비즈니스 로직 (기존 템플릿 복구) ---
-def get_dynamic_template(sub_cat, deal_type):
-    tmpl = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
-    return tmpl
+# --- [함수] 입력값 초기화 로직 ---
+def reset_input_fields():
+    """저장 성공 후 입력 필드들을 초기화합니다."""
+    st.session_state["reg_name"] = ""
+    st.session_state["reg_phone"] = ""
+    st.session_state["reg_addr"] = ""
+    st.session_state["reg_area"] = ""
+    st.session_state["reg_price"] = 0
+    st.session_state["reg_rent"] = 0
+    # 특약내용은 함수 내부에서 template을 다시 불러오므로 여기서는 초기화 생략 가능
 
 def process_area(input_str):
     if not input_str or input_str.strip() == "": return 0, "-" 
@@ -46,7 +44,6 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-# [기존 카테고리 구조로 복구]
 category_map = {
     "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], 
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"], 
@@ -58,6 +55,7 @@ with st.expander("➕ 새 매물 등록", expanded=False):
     col1, col2, col3 = st.columns([1, 1, 1.2])
     with col1:
         reg_date = st.date_input("접수일", datetime.today())
+        # key값을 부여하여 세션 상태에서 관리합니다.
         client_name = st.text_input("고객명", key="reg_name")
         client_phone = st.text_input("연락처", key="reg_phone")
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
@@ -65,31 +63,39 @@ with st.expander("➕ 새 매물 등록", expanded=False):
         sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
         deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
         addr = st.text_input("소재지 상세", key="reg_addr")
-        price = st.number_input("가액 (만원)", step=0)
-        rent = st.number_input("월세 (만원)", step=0) if deal_type == "월세" else 0
+        price = st.number_input("가액 (만원)", step=0, key="reg_price")
+        rent = st.number_input("월세 (만원)", step=0, key="reg_rent") if deal_type == "월세" else 0
     with col3:
         area_text = st.text_input("면적 입력", key="reg_area")
         _, py_display = process_area(area_text)
-        dynamic_tmpl = get_dynamic_template(sub_cat, deal_type)
-        memo = st.text_area("특약내용", value=dynamic_tmpl, height=200)
+        # 템플릿 생성
+        dynamic_tmpl = f"[{sub_cat} {deal_type} 상세]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
+        memo = st.text_area("특약내용", value=dynamic_tmpl, height=200, key="reg_memo")
 
     if st.button("🏠 구글 시트에 저장", use_container_width=True):
-        new_entry = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"), 
-            "고객명": client_name, "연락처": client_phone, 
-            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-            "가액": price, "월세": rent, "상태": "진행중", 
-            "소재지": addr, "특약사항": memo
-        }])
-        
-        updated_df = pd.concat([new_entry, df_list], ignore_index=True)
-        conn.update(data=updated_df)
-        st.success("매물이 구글 시트에 저장되었습니다!")
-        st.rerun()
+        if client_name and addr: # 최소한의 필수값 확인
+            new_entry = pd.DataFrame([{
+                "접수일": reg_date.strftime("%Y-%m-%d"), 
+                "고객명": client_name, "연락처": client_phone, 
+                "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
+                "가액": price, "월세": rent, "상태": "진행중", 
+                "소재지": addr, "특약사항": memo
+            }])
+            
+            updated_df = pd.concat([new_entry, df_list], ignore_index=True)
+            conn.update(data=updated_df)
+            
+            # [핵심] 저장 후 초기화 함수 실행
+            reset_input_fields()
+            
+            st.success("매물이 성공적으로 저장되었습니다! 입력창이 초기화되었습니다.")
+            st.rerun() # 화면을 새로고침하여 초기화된 값을 반영
+        else:
+            st.warning("고객명과 소재지는 필수 입력 사항입니다.")
 
 st.divider()
 
-# 3. 매물 필터링 및 목록
+# 3. 매물 필터링 및 목록 (기존과 동일)
 with st.expander("🔍 매물 검색 및 필터", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -130,7 +136,7 @@ if not df_filtered.empty:
         st.toast("구글 시트 업데이트 완료!")
         st.rerun()
 
-    # 4. 하단 상세 정보창
+    # 4. 하단 상세 정보창 (기존과 동일)
     st.markdown("---")
     item = df_filtered.loc[target_idx]
     st.markdown(f"### 🔍 [{item['소재지']}] 상세 정보")
