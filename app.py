@@ -119,7 +119,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- [수정] 5. 좌우 버튼 + 숫자 카운트 UI ---
+# --- [수정 완료] 5. 좌우 버튼 + 숫자 카운트 UI ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -130,7 +130,6 @@ if not df_filtered.empty:
     filtered_indices = df_filtered.index.tolist()
     total_count = len(filtered_indices)
     
-    # 인덱스 범위 초과 방지
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
@@ -143,15 +142,14 @@ if not df_filtered.empty:
             st.rerun()
 
     with slide_col2:
-        # 중앙에 현재 순서 표시 (예: 1 / 10)
-        st.markdown(f"<h3 style='text-align: center; margin-top: 0;'>{st.session_state.current_idx + 1} / {total_count}</h3>", unsafe_allow_テック=True)
+        # 이 부분이 수정되었습니다 (unsafe_allow_html=True)
+        st.markdown(f"<h3 style='text-align: center; margin-top: 10px;'>{st.session_state.current_idx + 1} / {total_count}</h3>", unsafe_allow_html=True)
 
     with slide_col3:
         if st.button("다음 ▶️", use_container_width=True):
             st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
             st.rerun()
 
-    # 데이터 로드
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
