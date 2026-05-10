@@ -33,6 +33,7 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
+# [데이터 구조] 대분류에 따른 소분류 매핑
 category_map = {
     "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], 
     "비주거용": ["상가/사무실", "빌딩/건물", "공장/창고", "지식산업센터", "숙박시설"], 
@@ -48,10 +49,12 @@ with st.expander("➕ 새 매물 등록", expanded=True):
             reg_date = st.date_input("접수일", datetime.today())
             client_name = st.text_input("고객명")
             client_phone = st.text_input("연락처")
+            # 대분류 선택
             main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
             
         with col2:
-            sub_cat = st.selectbox("물건 소분류", [item for sublist in category_map.values() for item in sublist])
+            # [핵심] 대분류(main_cat) 값에 따라 category_map에서 리스트를 실시간으로 가져옵니다.
+            sub_cat = st.selectbox("물건 소분류", category_map[main_cat])
             deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
             addr = st.text_input("소재지 상세")
             price = st.number_input("가액 (만원)", min_value=0, step=100)
@@ -66,7 +69,6 @@ with st.expander("➕ 새 매물 등록", expanded=True):
         submit_button = st.form_submit_button("🏠 구글 시트에 저장", use_container_width=True)
 
         if submit_button:
-            # [수정] 필수값 체크 로직을 제거하여 공란이라도 저장이 진행되게 함
             _, py_display = process_area(area_text)
             
             new_entry = pd.DataFrame([{
@@ -83,16 +85,15 @@ with st.expander("➕ 새 매물 등록", expanded=True):
                 "특약사항": memo
             }])
             
-            # 구글 시트에 데이터 추가
             updated_df = pd.concat([new_entry, df_list], ignore_index=True)
             conn.update(data=updated_df)
             
-            st.success("✅ 저장이 완료되었습니다. (공란 포함)")
+            st.success("✅ 저장이 완료되었습니다. (입력창 초기화)")
             st.rerun()
 
 st.divider()
 
-# 3. 매물 목록 및 수정 섹션 (기존 유지)
+# 3. 매물 목록 및 필터 (기존 유지)
 with st.expander("🔍 매물 검색 및 필터", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -123,7 +124,6 @@ if not df_filtered.empty:
     )
 
     if st.button("💾 변경 사항 구글 시트 반영", use_container_width=True):
-        # 전체 데이터를 덮어씌워 순서 유지를 보장합니다.
         conn.update(data=edited_df)
         st.toast("변경사항이 반영되었습니다.")
         st.rerun()
@@ -131,7 +131,7 @@ if not df_filtered.empty:
     # 상세 보기 섹션
     st.markdown("---")
     select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
-    target_idx = st.selectbox("🎯 상세 정보를 보낼 매물 선택", options=list(select_options.keys()), format_func=lambda x: select_options[x])
+    target_idx = st.selectbox("🎯 상세 정보를 볼 매물 선택", options=list(select_options.keys()), format_func=lambda x: select_options[x])
     
     item = df_filtered.loc[target_idx]
     with st.container(border=True):
