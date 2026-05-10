@@ -9,29 +9,28 @@ st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wi
 st.title("🏘️ 부동산 매물 등록 시스템 (클라우드 연동)")
 
 # --- [연결] 구글 스프레드시트 연결 ---
+# Streamlit Secrets에 저장된 정보를 자동으로 읽어오도록 설정합니다.
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
     """구글 시트에서 데이터를 불러오고 형식을 정제합니다."""
     try:
-        # 데이터 로드 (ttl=0으로 설정하여 캐시 없이 실시간 반영)
+        # 캐시 없이 실시간 데이터를 가져옵니다.
         data = conn.read(ttl=0)
         
-        # [오류 해결 핵심] 1. 전체 데이터의 빈 값(NaN)을 적절히 처리
-        data = data.dropna(how='all') # 완전히 비어있는 행 삭제
-        data = data.fillna("")        # 남은 빈 칸은 빈 문자열로 채움
+        # 데이터 정제: 빈 행 삭제 및 빈 칸 처리
+        data = data.dropna(how='all')
+        data = data.fillna("")
         
-        # [오류 해결 핵심] 2. 숫자 컬럼 강제 변환 (가액, 월세 등)
-        # 문자열이나 NaN이 섞여있으면 st.data_editor에서 오류가 발생함
+        # 숫자 컬럼 강제 변환 (가액, 월세) - 오류 방지 핵심
         num_cols = ["가액", "월세"]
         for col in num_cols:
             if col in data.columns:
-                # 숫자로 변환하되, 변환 안되는 값은 0으로 처리
                 data[col] = pd.to_numeric(data[col], errors='coerce').fillna(0).astype(int)
         
         return data
     except Exception as e:
-        # 시트가 아예 비어있거나 연결 오류 시 기본 틀 반환
+        # 시트 연결 실패 시 기본 빈 데이터프레임 반환
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류", "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
 # 데이터 로드
@@ -85,24 +84,25 @@ with st.expander("➕ 매물 등록하기", expanded=False):
             "소재지": addr, "특약사항": memo
         }])
         
+        # 새 데이터와 기존 데이터 합치기
         updated_df = pd.concat([new_entry, df_list], ignore_index=True)
+        # 구글 시트에 쓰기 작업 실행
         conn.update(data=updated_df)
-        st.success("매물이 구글 시트에 성공적으로 등록되었습니다!")
+        st.success("구글 시트에 안전하게 저장되었습니다!")
         st.rerun()
 
 st.divider()
 
-# 3. 매물 필터링 및 목록
+# 3. 매물 필터링 및 목록 출력
 with st.expander("🔍 매물 필터링 / 검색", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태 선택", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
     with f_col2: filter_cat = st.multiselect("대분류 선택", list(category_map.keys()), default=list(category_map.keys()))
     with f_col3: search_q = st.text_input("소재지 검색")
 
-# 필터링 적용
+# 필터링 로직
 df_filtered = df_list.copy()
 if not df_filtered.empty:
-    # 상태와 대분류 필터링 (데이터가 있을 때만)
     if '상태' in df_filtered.columns:
         df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
     if '대분류' in df_filtered.columns:
@@ -113,13 +113,12 @@ if not df_filtered.empty:
 st.subheader(f"📋 매물 목록 (조회: {len(df_filtered)}건)")
 
 if not df_filtered.empty:
-    # 선택 상자 (오류 방지를 위해 소재지가 비어있지 않은 데이터만 매핑)
     select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
     target_idx = st.selectbox("🎯 상세 정보를 보려면 매물을 선택하세요", 
                              options=list(select_options.keys()), 
                              format_func=lambda x: select_options[x])
 
-    # 데이터 편집기
+    # 데이터 수정 표
     edited_df = st.data_editor(
         df_filtered,
         use_container_width=True,
@@ -127,16 +126,14 @@ if not df_filtered.empty:
         column_config={
             "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
             "소재지": st.column_config.TextColumn("📍 소재지 상세", width="large"),
-            "특약사항": None # 목록에서는 숨김
         },
         column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
     )
 
     if st.button("💾 변경 사항 구글 시트 반영", use_container_width=True):
-        # 전체 리스트에서 편집된 내용만 업데이트
         df_list.update(edited_df)
         conn.update(data=df_list)
-        st.toast("구글 시트 업데이트가 완료되었습니다!")
+        st.toast("변경사항이 클라우드에 반영되었습니다.")
         st.rerun()
 
     # 4. 하단 상세 정보창
@@ -157,7 +154,7 @@ if not df_filtered.empty:
             if st.button("📝 특약사항만 즉시 저장"):
                 df_list.at[target_idx, '특약사항'] = updated_memo
                 conn.update(data=df_list)
-                st.success("특약사항이 구글 시트에 저장되었습니다.")
+                st.success("특약사항이 클라우드에 저장되었습니다.")
                 st.rerun()
 else:
     st.info("조회된 매물이 없습니다. 매물을 먼저 등록해 주세요.")
