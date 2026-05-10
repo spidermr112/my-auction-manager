@@ -83,36 +83,23 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
 st.divider()
 
-# --- [핵심 수정] 통합 필터 바 (한 줄 배치) ---
+# 3. 통합 필터 바
 st.subheader("🔍 통합 검색 필터")
-
-# 검색창과 3가지 필터를 한 줄(4컬럼)로 구성
 filter_row = st.container(border=True)
 with filter_row:
     c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
-    
-    with c1:
-        search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
-    with c2:
-        f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
-    with c3:
-        f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
-    with c4:
-        status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
+    with c1: search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
+    with c2: f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
+    with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
+    with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
 
-# 필터링 적용
 df_filtered = df_list.copy()
 if not df_filtered.empty:
     df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
     if '대분류' in df_filtered.columns:
         df_filtered = df_filtered[df_filtered['대분류'].isin(f_main_cat)]
-    # 거래 구분이 데이터에 명시적으로 없더라도 검색어나 특약사항 기반으로 필터링 가능하지만, 
-    # 여기서는 '구분'이라는 값이 저장된다고 가정합니다.
     if search_q:
-        df_filtered = df_filtered[
-            df_filtered['소재지'].str.contains(search_q, na=False) | 
-            df_filtered['고객명'].str.contains(search_q, na=False)
-        ]
+        df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
 
 # 4. 목록 표시
 st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
@@ -132,26 +119,61 @@ if st.button("💾 변경사항 저장", use_container_width=True):
     st.toast("저장되었습니다!")
     st.rerun()
 
-# 5. 상세 브리핑 카드
+# --- [핵심 수정] 5. 모바일 최적화 상세 브리핑 슬라이더 ---
 if not df_filtered.empty:
     st.markdown("---")
-    st.subheader("📋 선택 매물 상세 정보")
-    property_options = {i: f"[{row['소분류']}] {row['소재지']}" for i, row in df_filtered.iterrows()}
-    selected_idx = st.selectbox("🎯 상세 내용을 확인할 매물을 선택하세요", options=list(property_options.keys()), format_func=lambda x: property_options[x])
+    st.subheader("📋 매물 상세 브리핑 (슬라이드)")
 
-    if selected_idx is not None:
-        item = df_filtered.loc[selected_idx]
-        with st.container(border=True):
-            sc1, sc2 = st.columns([1, 2])
-            with sc1:
-                st.info(f"**📍 {item['소재지']}**")
-                st.write(f"🏠 {item['대분류']} > {item['소분류']}")
-                st.write(f"💰 {item['가액']} / {item['월세']} ({item['면적']})")
-                st.write(f"👤 {item['고객명']} ({item['연락처']})")
-            with sc2:
-                new_memo = st.text_area("메모 수정", value=item['특약사항'], height=150, key=f"m_{selected_idx}")
-                if st.button("📝 메모 저장"):
-                    df_list.at[selected_idx, '특약사항'] = new_memo
-                    conn.update(data=df_list)
-                    st.success("수정되었습니다.")
-                    st.rerun()
+    # 현재 보고 있는 매물의 인덱스를 세션에 저장
+    if "current_idx" not in st.session_state:
+        st.session_state.current_idx = 0
+
+    # 필터링된 데이터의 인덱스 리스트
+    filtered_indices = df_filtered.index.tolist()
+    
+    # 슬라이드 제어 버튼 (이전 / 매물선택 / 다음)
+    btn_col1, btn_col2, btn_col3 = st.columns([1, 2, 1])
+    
+    with btn_col1:
+        if st.button("⬅️ 이전 매물", use_container_width=True):
+            st.session_state.current_idx = (st.session_state.current_idx - 1) % len(filtered_indices)
+            
+    with btn_col2:
+        # 직접 선택도 가능하게 연동
+        selected_real_idx = st.selectbox(
+            "매물 선택", 
+            options=filtered_indices,
+            index=st.session_state.current_idx,
+            format_func=lambda x: f"[{df_filtered.loc[x, '소분류']}] {df_filtered.loc[x, '소재지']}",
+            key="slider_select"
+        )
+        # selectbox로 직접 골랐을 때도 index 동기화
+        st.session_state.current_idx = filtered_indices.index(selected_real_idx)
+
+    with btn_col3:
+        if st.button("다음 매물 ➡️", use_container_width=True):
+            st.session_state.current_idx = (st.session_state.current_idx + 1) % len(filtered_indices)
+
+    # 실제 보여줄 매물 데이터
+    item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
+    
+    # 모바일에서 보기 편한 카드 디자인
+    with st.container(border=True):
+        st.info(f"📍 **{item['소재지']}**")
+        c1, c2 = st.columns(2)
+        with c1:
+            st.write(f"🏷️ **분류:** {item['소분류']}")
+            st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
+        with c2:
+            st.write(f"📏 **면적:** {item['면적']}")
+            st.write(f"👤 **고객:** {item['고객명']}")
+        
+        st.write(f"📞 **연락처:** {item['연락처']}")
+        
+        st.markdown("**📜 상세 메모**")
+        new_memo = st.text_area("메모 수정", value=item['특약사항'], height=200, key=f"slide_memo_{item.name}")
+        if st.button("📝 메모 저장", key=f"save_btn_{item.name}"):
+            df_list.at[item.name, '특약사항'] = new_memo
+            conn.update(data=df_list)
+            st.success("메모가 저장되었습니다.")
+            st.rerun()
