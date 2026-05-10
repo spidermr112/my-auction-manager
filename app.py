@@ -39,9 +39,8 @@ category_map = {
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지", "복수토지"]
 }
 
-# 2. 매물 등록하기 (st.form 적용으로 자동 초기화 구현)
+# 2. 매물 등록하기
 with st.expander("➕ 새 매물 등록", expanded=True):
-    # clear_on_submit=True 설정이 핵심입니다. 버튼 누르면 입력창이 비워집니다.
     with st.form("entry_form", clear_on_submit=True):
         col1, col2, col3 = st.columns([1, 1, 1.2])
         
@@ -59,36 +58,41 @@ with st.expander("➕ 새 매물 등록", expanded=True):
             rent = st.number_input("월세 (만원)", min_value=0, step=10)
             
         with col3:
-            area_text = st.text_input("면적 입력 (예: 30평 또는 100m2)")
+            area_text = st.text_input("면적 입력")
             dynamic_tmpl = f" 상세 정보\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
             memo = st.text_area("특약내용 및 상세설명", value=dynamic_tmpl, height=200)
 
-        # 폼 전용 저장 버튼
+        # 저장 버튼
         submit_button = st.form_submit_button("🏠 구글 시트에 저장", use_container_width=True)
 
         if submit_button:
-            if client_name.strip() and addr.strip():
-                _, py_display = process_area(area_text)
-                
-                new_entry = pd.DataFrame([{
-                    "접수일": reg_date.strftime("%Y-%m-%d"), 
-                    "고객명": client_name, "연락처": client_phone, 
-                    "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-                    "가액": price, "월세": rent, "상태": "진행중", 
-                    "소재지": addr, "특약사항": memo
-                }])
-                
-                updated_df = pd.concat([new_entry, df_list], ignore_index=True)
-                conn.update(data=updated_df)
-                
-                st.success("✅ 저장 완료! 입력창이 초기화되었습니다.")
-                st.rerun()
-            else:
-                st.error("⚠️ 고객명과 소재지는 필수입니다.")
+            # [수정] 필수값 체크 로직을 제거하여 공란이라도 저장이 진행되게 함
+            _, py_display = process_area(area_text)
+            
+            new_entry = pd.DataFrame([{
+                "접수일": reg_date.strftime("%Y-%m-%d"), 
+                "고객명": client_name, 
+                "연락처": client_phone, 
+                "대분류": main_cat, 
+                "소분류": sub_cat, 
+                "면적": py_display, 
+                "가액": price, 
+                "월세": rent, 
+                "상태": "진행중", 
+                "소재지": addr, 
+                "특약사항": memo
+            }])
+            
+            # 구글 시트에 데이터 추가
+            updated_df = pd.concat([new_entry, df_list], ignore_index=True)
+            conn.update(data=updated_df)
+            
+            st.success("✅ 저장이 완료되었습니다. (공란 포함)")
+            st.rerun()
 
 st.divider()
 
-# 3. 매물 목록 및 수정 (기존 구조 유지)
+# 3. 매물 목록 및 수정 섹션 (기존 유지)
 with st.expander("🔍 매물 검색 및 필터", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
@@ -119,6 +123,7 @@ if not df_filtered.empty:
     )
 
     if st.button("💾 변경 사항 구글 시트 반영", use_container_width=True):
+        # 전체 데이터를 덮어씌워 순서 유지를 보장합니다.
         conn.update(data=edited_df)
         st.toast("변경사항이 반영되었습니다.")
         st.rerun()
@@ -126,7 +131,7 @@ if not df_filtered.empty:
     # 상세 보기 섹션
     st.markdown("---")
     select_options = {i: f"{row['소재지']} ({row['고객명']})" for i, row in df_filtered.iterrows()}
-    target_idx = st.selectbox("🎯 상세 정보를 볼 매물 선택", options=list(select_options.keys()), format_func=lambda x: select_options[x])
+    target_idx = st.selectbox("🎯 상세 정보를 보낼 매물 선택", options=list(select_options.keys()), format_func=lambda x: select_options[x])
     
     item = df_filtered.loc[target_idx]
     with st.container(border=True):
@@ -143,4 +148,4 @@ if not df_filtered.empty:
                 st.success("특약사항이 수정되었습니다.")
                 st.rerun()
 else:
-    st.info("검색된 매물이 없습니다.")
+    st.info("조회된 매물이 없습니다.")
