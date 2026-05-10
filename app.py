@@ -5,7 +5,7 @@ import re
 
 # 1. 페이지 설정
 st.set_page_config(page_title="파크부동산", page_icon="🏘️", layout="wide")
-st.title("🏘️ 파크부동산 매물 등록 시스템")
+st.title("🏘️ 부동산 매물 등록 시스템")
 
 # --- [기존 로직 유지] ---
 def get_dynamic_template(sub_cat, deal_type):
