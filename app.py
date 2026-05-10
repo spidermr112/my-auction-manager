@@ -4,27 +4,24 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [절대 흐트러지지 않는 한 줄] CSS
+# 1. 페이지 설정 및 [디자인 복구 + 한 줄 센터 고정] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 1. 내비게이션 바: 3개를 하나로 묶어서 센터 정렬 */
+    /* 1. 내비게이션 바: 이전 1/8 다음을 한 줄로 강제 고정 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
-        flex-direction: row !important; /* 무조건 가로 유지 */
+        flex-direction: row !important; /* 모바일에서도 가로 유지 */
         justify-content: center !important; /* 중앙 정렬 */
         align-items: center !important;
-        gap: 0px !important; /* 요소 사이 간격 제거 */
-        width: fit-content !important; /* 내용만큼만 너비 차지 */
-        margin: 10px auto !important; /* 화면 정중앙 배치 */
-        background-color: #f1f3f5 !important; /* 연한 회색 배경 */
-        padding: 5px 15px !important;
-        border-radius: 50px !important; /* 알약 모양 */
-        border: 1px solid #dee2e6 !important;
+        gap: 5px !important;
+        width: 100% !important;
+        margin: 10px 0 !important;
+        padding: 0 !important;
     }
     
-    /* 2. 컬럼이 모바일에서도 밑으로 떨어지지 않게 고정 */
+    /* 2. 각 컬럼(이전, 숫자, 다음)의 너비를 내용만큼만 차지하게 조절 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
         flex: 0 0 auto !important;
         width: auto !important;
@@ -32,33 +29,38 @@ st.markdown("""
         padding: 0 !important;
     }
 
-    /* 3. 이전/다음 버튼: 배경 빼고 글자만 깔끔하게 */
+    /* 3. 버튼 디자인: 이전의 깔끔하고 신뢰감 있는 사각형 스타일 */
     .stButton > button[key^="btn_nav_"] {
-        border: none !important;
-        background: transparent !important;
-        color: #007AFF !important;
-        font-weight: 800 !important;
-        font-size: 16px !important;
-        padding: 0 10px !important;
-        height: 34px !important;
-        width: auto !important;
+        border: 1px solid #d1d5db !important;
+        background-color: white !important;
+        color: #374151 !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        height: 38px !important;
+        padding: 0 15px !important;
+        border-radius: 6px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.05) !important;
     }
     
-    .stButton > button[key^="btn_nav_"]:hover {
-        background: rgba(0, 122, 255, 0.1) !important;
-        border-radius: 20px !important;
-    }
-
-    /* 4. 중앙 숫자 (8/8) */
+    /* 4. 중앙 숫자: 버튼 높이와 맞춰서 정렬 */
     .nav-counter {
-        font-weight: 700;
-        color: #333;
-        font-size: 15px;
+        font-size: 16px !important;
+        font-weight: 700 !important;
+        color: #111827 !important;
+        line-height: 38px;
         padding: 0 10px;
-        line-height: 34px;
+        text-align: center;
     }
     
     .nav-marker { display: none; }
+
+    /* 5. 하단 저장 버튼 */
+    .stButton > button[key^="save_slide_"] {
+        height: 45px !important;
+        border-radius: 8px !important;
+        font-weight: 700 !important;
+        margin-top: 10px !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -174,7 +176,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. [상세 브리핑 영역] ---
+# --- 5. 상세 브리핑 영역 (순서 최적화) ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -184,10 +186,7 @@ if not df_filtered.empty:
 
     filtered_indices = df_filtered.index.tolist()
     total_count = len(filtered_indices)
-    
-    if st.session_state.current_idx >= total_count:
-        st.session_state.current_idx = 0
-
+    st.session_state.current_idx %= total_count
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
@@ -203,24 +202,24 @@ if not df_filtered.empty:
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
         
-        # 1. 메모장
+        # 5-1. 메모장
         new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
         
-        # 2. [센터 정렬 내비게이션 바] - 이전 8/8 다음
-        nav_c1, nav_c2, nav_c3 = st.columns([1, 1, 1])
-        with nav_c1:
+        # 5-2. [한 줄 고정] 내비게이션 바
+        n_col1, n_col2, n_col3 = st.columns([1, 1, 1])
+        with n_col1:
             st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
             if st.button("◀ 이전", key="btn_nav_prev"):
                 st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
                 st.rerun()
-        with nav_c2:
+        with n_col2:
             st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
-        with nav_c3:
+        with n_col3:
             if st.button("다음 ▶", key="btn_nav_next"):
                 st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
                 st.rerun()
 
-        # 3. 메모 저장 버튼
+        # 5-3. 메모 저장 버튼
         if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
