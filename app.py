@@ -4,25 +4,24 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 1. 페이지 설정 및 [상단 이동 + 밸런스 UI] CSS
+# 1. 페이지 설정 및 [세련된 콤팩트 UI] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 컨트롤러 바 (상단 이동용 디자인) */
+    /* 컨트롤러 바: 가로폭 최소화 및 중앙 정렬 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-wrap: nowrap !important;
         justify-content: center !important;
         align-items: center !important;
-        gap: 10px !important;
+        gap: 5px !important;
         width: fit-content !important;
-        margin: 10px auto 20px auto !important; /* 상단 여백 최소화, 하단 여백 확보 */
-        background-color: #f0f2f6 !important; /* 연한 블루 그레이 배경 */
-        padding: 8px 20px !important;
+        margin: 15px auto !important; /* 메모장과 저장 버튼 사이 적절한 여백 */
+        background-color: #f8f9fa !important;
+        padding: 5px 15px !important;
         border-radius: 50px !important;
-        border: 1px solid #d1d5db !important;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05) !important;
+        border: 1px solid #e0e0e0 !important;
     }
     
     /* 각 컬럼 너비 고정 */
@@ -32,12 +31,12 @@ st.markdown("""
         width: auto !important;
     }
 
-    /* 버튼 스타일: 밸런스 잡힌 원형 버튼 */
+    /* 버튼 스타일: 깔끔한 원형 버튼 */
     .stButton > button[key^="btn_nav_"] {
-        width: 38px !important;
-        height: 38px !important;
+        width: 34px !important;
+        height: 34px !important;
         padding: 0 !important;
-        font-size: 16px !important;
+        font-size: 14px !important;
         border-radius: 50% !important;
         border: 1px solid #d1d5db !important;
         background-color: white !important;
@@ -45,31 +44,18 @@ st.markdown("""
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: all 0.2s !important;
     }
     
-    .stButton > button[key^="btn_nav_"]:hover {
-        border-color: #005088 !important;
-        color: #005088 !important;
-        background-color: #f8fafc !important;
-    }
-
     /* 숫자 카운트 텍스트 */
     .nav-counter {
-        font-size: 18px !important;
+        font-size: 15px !important;
         font-weight: 700 !important;
-        color: #005088 !important;
-        margin: 0 15px !important;
-        font-family: 'monospace' !important;
+        color: #333 !important;
+        margin: 0 10px !important;
+        line-height: 34px;
     }
     
-    /* 마커 숨김 */
     .nav-marker { display: none; }
-    
-    /* 카드 정보 가독성 향상 */
-    .prop-info-box {
-        margin-top: 0 !important;
-    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -112,7 +98,7 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-# 2. 상단 버튼 및 등록창
+# 2. 상단 버튼 및 등록창 (기존 유지)
 col_top1, col_top2 = st.columns([8, 2])
 with col_top2:
     st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True)
@@ -149,7 +135,7 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
 st.divider()
 
-# 3. 통합 필터 바
+# 3. 통합 필터 바 (기존 유지)
 st.subheader("🔍 통합 검색 필터")
 filter_row = st.container(border=True)
 with filter_row:
@@ -167,7 +153,7 @@ if not df_filtered.empty:
     if search_q:
         df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
 
-# 4. 목록 표시
+# 4. 목록 표시 (기존 유지)
 st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
 edited_df = st.data_editor(
     df_filtered,
@@ -185,7 +171,7 @@ if st.button("💾 변경사항 저장", key="save_main_df", use_container_width
     st.toast("저장되었습니다!")
     st.rerun()
 
-# --- 5. [최종 완성형] 상단 배치 내비게이션 + 정보 카드 ---
+# --- 5. [상세 브리핑 영역] 순서 변경 최적화 ---
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -199,27 +185,6 @@ if not df_filtered.empty:
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
-    # 5-1. 상단 내비게이션 버튼 (정보 카드 위로 이동)
-    nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
-    
-    with nav_col1:
-        st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-        if st.button("◀", key="btn_nav_prev", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-            st.rerun()
-
-    with nav_col2:
-        st.markdown(
-            f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", 
-            unsafe_allow_html=True
-        )
-
-    with nav_col3:
-        if st.button("▶", key="btn_nav_next", use_container_width=True):
-            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
-            st.rerun()
-
-    # 5-2. 정보 카드 (내비게이션 아래에 배치)
     item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
     
     with st.container(border=True):
@@ -234,7 +199,25 @@ if not df_filtered.empty:
         
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
+        
+        # 5-1. 메모장 (먼저 배치)
         new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
+        
+        # 5-2. 내비게이션 버튼 (메모 저장 바로 위로 이동)
+        nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+        with nav_col1:
+            st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
+            if st.button("◀", key="btn_nav_prev", use_container_width=True):
+                st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
+                st.rerun()
+        with nav_col2:
+            st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
+        with nav_col3:
+            if st.button("▶", key="btn_nav_next", use_container_width=True):
+                st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
+                st.rerun()
+
+        # 5-3. 메모 저장 버튼 (최하단)
         if st.button("📝 메모 저장", key=f"save_slide_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
