@@ -33,62 +33,66 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-# [데이터 구조] 대분류에 따른 소분류 매핑 (요청하신 대로 비주거용 항목 강화)
+# 카테고리 맵
 category_map = {
     "주거용": ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"], 
     "비주거용": ["상가", "사무실", "공장", "창고", "빌딩/건물", "지식산업센터", "숙박시설"], 
     "토지": ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"]
 }
 
-# 2. 매물 등록하기
+# 2. 매물 등록하기 (st.form을 제거하여 실시간 연동 구현)
 with st.expander("➕ 새 매물 등록", expanded=True):
-    with st.form("entry_form", clear_on_submit=True):
-        col1, col2, col3 = st.columns([1, 1, 1.2])
+    col1, col2, col3 = st.columns([1, 1, 1.2])
+    
+    with col1:
+        reg_date = st.date_input("접수일", datetime.today())
+        # key를 부여하여 나중에 수동으로 비울 수 있게 합니다.
+        client_name = st.text_input("고객명", key="in_name")
+        client_phone = st.text_input("연락처", key="in_phone")
+        # [실시간 연동] 라디오 버튼 클릭 시 즉시 스크립트가 재실행됩니다.
+        main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, key="in_main")
         
-        with col1:
-            reg_date = st.date_input("접수일", datetime.today())
-            client_name = st.text_input("고객명")
-            client_phone = st.text_input("연락처")
-            # 대분류 선택 (주거용, 비주거용, 토지)
-            main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True)
-            
-        with col2:
-            # [핵심 수정] 선택된 main_cat에 해당하는 리스트만 options로 제공
-            sub_cat = st.selectbox("물건 소분류", options=category_map[main_cat])
-            deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True)
-            addr = st.text_input("소재지 상세")
-            price = st.number_input("가액 (만원)", min_value=0, step=100)
-            rent = st.number_input("월세 (만원)", min_value=0, step=10)
-            
-        with col3:
-            area_text = st.text_input("면적 입력")
-            # 소분류와 구분에 따른 동적 템플릿 (selectbox 값이 바뀌면 자동으로 바뀜)
-            dynamic_tmpl = f"[{sub_cat} {deal_type} 상세정보]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
-            memo = st.text_area("특약내용 및 상세설명", value=dynamic_tmpl, height=200)
+    with col2:
+        # [실시간 연동] 위에서 선택한 main_cat에 따라 options가 즉시 바뀝니다.
+        sub_cat = st.selectbox("물건 소분류", options=category_map[main_cat], key="in_sub")
+        deal_type = st.radio("구분", ["매매", "전세", "월세"], horizontal=True, key="in_deal")
+        addr = st.text_input("소재지 상세", key="in_addr")
+        price = st.number_input("가액 (만원)", min_value=0, step=100, key="in_price")
+        rent = st.number_input("월세 (만원)", min_value=0, step=10, key="in_rent")
+        
+    with col3:
+        area_text = st.text_input("면적 입력", key="in_area")
+        # 소분류가 바뀔 때마다 템플릿 문구도 자동으로 변경됩니다.
+        dynamic_tmpl = f"[{sub_cat} {deal_type} 상세정보]\n- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: "
+        memo = st.text_area("특약내용 및 상세설명", value=dynamic_tmpl, height=200, key="in_memo")
 
-        # 저장 버튼
-        submit_button = st.form_submit_button("🏠 구글 시트에 저장", use_container_width=True)
-
-        if submit_button:
-            _, py_display = process_area(area_text)
-            
-            new_entry = pd.DataFrame([{
-                "접수일": reg_date.strftime("%Y-%m-%d"), 
-                "고객명": client_name, "연락처": client_phone, 
-                "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-                "가액": price, "월세": rent, "상태": "진행중", 
-                "소재지": addr, "특약사항": memo
-            }])
-            
-            updated_df = pd.concat([new_entry, df_list], ignore_index=True)
-            conn.update(data=updated_df)
-            
-            st.success(f"✅ {sub_cat} 매물이 저장되었습니다!")
-            st.rerun()
+    # 저장 버튼 (st.form 외부이므로 일반 st.button 사용)
+    if st.button("🏠 구글 시트에 저장", use_container_width=True):
+        _, py_display = process_area(area_text)
+        
+        new_entry = pd.DataFrame([{
+            "접수일": reg_date.strftime("%Y-%m-%d"), 
+            "고객명": client_name, "연락처": client_phone, 
+            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
+            "가액": price, "월세": rent, "상태": "진행중", 
+            "소재지": addr, "특약사항": memo
+        }])
+        
+        # 구글 시트 업데이트
+        updated_df = pd.concat([new_entry, df_list], ignore_index=True)
+        conn.update(data=updated_df)
+        
+        # [중요] 저장 후 모든 입력창 초기화 로직
+        for key in ["in_name", "in_phone", "in_addr", "in_area", "in_price", "in_rent", "in_memo"]:
+            if key in st.session_state:
+                st.session_state[key] = "" if "price" not in key and "rent" not in key else 0
+        
+        st.success("✅ 저장이 완료되었습니다!")
+        st.rerun() # 전체 화면을 새로고침하여 초기 상태로 복구
 
 st.divider()
 
-# 3. 매물 목록 및 수정 섹션 (이하 동일)
+# 3. 매물 목록 및 수정 섹션 (기존 코드와 동일)
 with st.expander("🔍 매물 검색 및 필터", expanded=False):
     f_col1, f_col2, f_col3 = st.columns([1, 1, 1])
     with f_col1: status_list = st.multiselect("상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"])
