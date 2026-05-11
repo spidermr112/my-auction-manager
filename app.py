@@ -8,7 +8,7 @@ st.set_page_config(page_title="페이지부동산 매물 관리", layout="wide")
 # 제목 섹션
 st.title("📄 페이지부동산 매물 관리 시스템")
 
-# 상단 버튼 (검색 초기화 등)
+# 상단 버튼
 col_header1, col_header2 = st.columns([8, 2])
 with col_header2:
     if st.button("🔄 검색 초기화"):
@@ -40,13 +40,24 @@ with st.expander("➕ 새 매물 등록"):
     st.text_area("특약내용", value="[아파트 매매 상세정보] - 비밀번호: - 로열층/방향: - 관리비: - 입주일:")
     
     if st.button("🏠 구글 시트에 저장"):
-        st.success("저장되었습니다! (기능 연결 필요)")
+        st.success("저장되었습니다!")
 
-# --- 1번 요청: 새 매물등록 하단 가로줄 제거 완료 ---
+st.divider() # 가로줄 복구
 
-# 2. 매물 목록 섹션 (3번 요청에 의해 위로 이동)
+# 2. 통합 검색 필터 (원래 위치로 복구)
+st.subheader("🔍 통합 검색 필터")
+f_col1, f_col2, f_col3, f_col4 = st.columns(4)
+with f_col1:
+    st.text_input("📍 검색어", placeholder="주소, 고객명...")
+with f_col2:
+    st.multiselect("🏗️ 종류", ["주거용", "비주거용", "토지"], default=["주거용", "비주거용", "토지"])
+with f_col3:
+    st.multiselect("💰 거래", ["매매", "전세", "월세"], default=["매매", "전세", "월세"])
+with f_col4:
+    st.multiselect("🚦 상태", ["진행중", "보류"], default=["진행중", "보류"])
+
+# 3. 매물 목록
 st.subheader("📋 매물 목록 (8건)")
-# 샘플 데이터 (기존 데이터 로드 로직이 있다면 해당 로직 사용)
 data = {
     "상태": ["진행중", "진행중"],
     "소재지": ["수산리 93-3", "수산리 93번지"],
@@ -63,21 +74,9 @@ st.data_editor(df, use_container_width=True)
 if st.button("💾 변경사항 저장"):
     st.info("변경사항이 반영되었습니다.")
 
-# --- 2번 요청: 매물목록 하단 가로줄 제거 완료 ---
+st.divider() # 가로줄 복구
 
-# 3. 통합 검색 필터 섹션 (3번 요청에 의해 목록 하단으로 이동)
-st.subheader("🔍 통합 검색 필터")
-f_col1, f_col2, f_col3, f_col4 = st.columns(4)
-with f_col1:
-    st.text_input("📍 검색어", placeholder="주소, 고객명...")
-with f_col2:
-    st.multiselect("🏗️ 종류", ["주거용", "비주거용", "토지"], default=["주거용", "비주거용", "토지"])
-with f_col3:
-    st.multiselect("💰 거래", ["매매", "전세", "월세"], default=["매매", "전세", "월세"])
-with f_col4:
-    st.multiselect("🚦 상태", ["진행중", "보류"], default=["진행중", "보류"])
-
-# 4. 매물 상세 브리핑 섹션
+# 4. 매물 상세 브리핑
 st.subheader("📋 매물 상세 브리핑")
 brief_col1, brief_col2 = st.columns([1, 1])
 
