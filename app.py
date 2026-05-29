@@ -273,70 +273,27 @@ with tab_search:
             label_visibility="collapsed",
         )
 
-        # ── 네비게이션 바 ──────────────────────────────────────
-        # 구조: 예쁜 HTML 바(시각) + 숨긴 Streamlit 버튼(동작)
-        # JS가 숨긴 버튼을 직접 클릭 → Streamlit 이벤트 정상 발생
-        # st.columns 없이 HTML flexbox → 모바일도 항상 한 줄
+        # ── 네비게이션 ──────────────────────────────────────────
+        # 카운터: 버튼과 분리해서 위에 단독 표시
+        # 버튼:   st.columns(2) 두 개만 → 모바일도 가로 유지
         # ────────────────────────────────────────────────────────
-        import streamlit.components.v1 as components
-
-        # 1) 예쁜 HTML 네비게이션 바
-        st.markdown(f"""
-        <div style="
-            display:flex; align-items:center; gap:6px;
-            background:#f0f2f6; border:1px solid #dde1e9;
-            border-radius:10px; padding:4px 6px; height:52px;
-            margin: 8px 0 0;
-        ">
-            <button onclick="clickHidden('btn_nav_prev')" style="
-                flex:0 0 80px; height:44px; background:white;
-                border:1px solid #d0d5dd; border-radius:8px;
-                font-size:16px; font-weight:700; color:#31333f;
-                cursor:pointer; touch-action:manipulation;
-            ">◀ 이전</button>
-            <div style="
-                flex:1; text-align:center;
-                font-size:17px; font-weight:700; color:#31333f;
-            ">{cur + 1} <span style="font-size:13px;font-weight:400;color:#999;margin:0 2px">/</span> {total_count}</div>
-            <button onclick="clickHidden('btn_nav_next')" style="
-                flex:0 0 80px; height:44px; background:white;
-                border:1px solid #d0d5dd; border-radius:8px;
-                font-size:16px; font-weight:700; color:#31333f;
-                cursor:pointer; touch-action:manipulation;
-            ">다음 ▶</button>
-        </div>
-        <script>
-        function clickHidden(key) {{
-            // Streamlit 숨긴 버튼을 key로 찾아 클릭
-            const btns = window.parent.document.querySelectorAll('button');
-            for (const b of btns) {{
-                if (b.innerText.trim() === '◀' && key === 'btn_nav_prev') {{ b.click(); break; }}
-                if (b.innerText.trim() === '▶' && key === 'btn_nav_next') {{ b.click(); break; }}
-            }}
-        }}
-        </script>
-        """, unsafe_allow_html=True)
-
-        # 2) 실제 동작하는 숨긴 Streamlit 버튼 (CSS로 안 보이게)
-        st.markdown("""
-        <style>
-        button[data-testid="stBaseButton-secondary"][key="btn_nav_prev"],
-        button[data-testid="stBaseButton-secondary"][key="btn_nav_next"] {
-            position: absolute !important;
-            width: 1px !important; height: 1px !important;
-            overflow: hidden !important; opacity: 0 !important;
-            pointer-events: none !important;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+        st.markdown(
+            f"<div style='text-align:center; padding: 8px 0 4px;"
+            f"font-size:17px; font-weight:700; color:#31333f;'>"
+            f"{cur + 1}"
+            f"<span style='font-size:13px; font-weight:400;"
+            f"color:#999; margin:0 6px'>/</span>"
+            f"{total_count}</div>",
+            unsafe_allow_html=True,
+        )
 
         col_prev, col_next = st.columns(2)
         with col_prev:
-            if st.button("◀", key="btn_nav_prev", use_container_width=True):
+            if st.button("◀ 이전", key="btn_nav_prev", use_container_width=True):
                 st.session_state.current_idx = (cur - 1) % total_count
                 st.rerun()
         with col_next:
-            if st.button("▶", key="btn_nav_next", use_container_width=True):
+            if st.button("다음 ▶", key="btn_nav_next", use_container_width=True):
                 st.session_state.current_idx = (cur + 1) % total_count
                 st.rerun()
 
