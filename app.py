@@ -26,9 +26,9 @@ st.markdown("""
     
     /* 탭 메뉴 디자인 세련되게 변경 */
     button[data-baseweb="tab"] {
-        font-size: 16px !important;
+        font-size: 15px !important; /* 모바일을 위해 폰트 크기 살짝 조정 */
         font-weight: bold !important;
-        padding: 12px 20px !important;
+        padding: 10px 15px !important; /* 여백을 줄여 폰 화면 공간 확보 */
     }
     
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
@@ -100,16 +100,16 @@ def process_area(input_str):
     return p, f"{p}평"
 
 
-# 🔄 요청하신 순서대로 3단 탭 구성 변경!
+# 🔄 폰 화면에 딱 맞춘 4글자 탭 구성 (선언 순서 매칭 완료)
 tab_register, tab_list, tab_search = st.tabs([
-    "➕ 신규 매물 등록", 
-    "📋 전체 목록 현황", 
-    "🔍 매물 검색 및 브리핑"
+    "➕ 신규등록", 
+    "📋 전체목록", 
+    "🔍 목록검색"
 ])
 
 
 # ==========================================
-# 1번째 탭: 신규 매물 등록
+# 1번째 탭: ➕ 신규등록
 # ==========================================
 with tab_register:
     st.subheader("➕ 신규 매물 등록 시스템")
@@ -153,32 +153,29 @@ with tab_register:
                 updated_df = pd.concat([new_entry, df_list], ignore_index=True)
                 conn.update(data=updated_df)
                 st.success("🎉 새로운 매물이 구글 시트에 완벽하게 기록되었습니다!")
-                
-                # 저장 후 등록 입력 폼 비우기 위해 리런
                 st.rerun()
 
 
 # ==========================================
-# 2번째 탭: 전체 목록 현황
+# 2번째 탭: 📋 전체목록
 # ==========================================
 with tab_list:
     st.subheader(f"📋 등록 매물 목록 ({len(df_list)}건)")
     
-    # 탭 1에서 새로 등록된 내용을 즉각 반영하여 전체 리스트를 깔끔한 정렬 순서로 표출
     st.data_editor(
         df_list,
         use_container_width=True,
         hide_index=False,
         column_config={
             "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-            "특약사항": None  # 목록 표에서는 메모 공간 제외
+            "특약사항": None
         },
         column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
     )
 
 
 # ==========================================
-# 3번째 탭: 매물 검색 및 브리핑
+# 3번째 탭: 🔍 목록검색
 # ==========================================
 with tab_search:
     col_top1, col_top2 = st.columns([8, 2])
