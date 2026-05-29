@@ -53,8 +53,9 @@ st.markdown("""
     /* 탭 메뉴 디자인 */
     button[data-baseweb="tab"] { font-size: 15px !important; font-weight: 700 !important; padding: 10px 18px !important; }
     
-    /* 💡 [대표님 가이드라인] 50px - 100px - 50px 모바일 강제 가로 정렬 고정 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
+    /* 💡 마커 바로 다음에 오는 레이아웃 블록을 정확히 지정하여 가로 206px 중앙 박제 */
+    div.nav-marker + div[data-testid="stHorizontalBlock"],
+    div.nav-marker + div[data-testid="stColumns"] {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
@@ -66,8 +67,9 @@ st.markdown("""
         margin: 20px auto !important;
     }
     
-    /* 💡 [수평 파괴 버그 수정] 내부 컬럼 자체를 Flex 수직 중앙정렬로 강제 변환 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="stColumn"] {
+    /* 세 개의 컬럼 내부 정렬을 완벽하게 일체화 */
+    div.nav-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"],
+    div.nav-marker + div[data-testid="stColumns"] > div[data-testid="stColumn"] {
         padding: 0 !important; 
         margin: 0 !important; 
         flex: none !important;
@@ -77,37 +79,37 @@ st.markdown("""
         justify-content: center !important;
     }
     
-    /* 내부의 유령 엘리먼트 컨테이너들까지 전부 수직 중앙으로 수평 매칭 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="element-container"] {
+    /* 내부에 들어찬 엘리먼트 껍데기들의 높낮이 오차 원천 차단 */
+    div.nav-marker + div[data-testid="stHorizontalBlock"] [data-testid="element-container"],
+    div.nav-marker + div[data-testid="stColumns"] [data-testid="element-container"] {
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
     }
     
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="stColumn"]:nth-of-type(1) {
-        width: 50px !important; min-width: 50px !important; max-width: 50px !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="stColumn"]:nth-of-type(2) {
-        width: 100px !important; min-width: 100px !important; max-width: 100px !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="stColumn"]:nth-of-type(3) {
-        width: 50px !important; min-width: 50px !important; max-width: 50px !important;
-    }
+    /* 50px - 100px - 50px 너비 물리 고정 */
+    div.nav-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(1),
+    div.nav-marker + div[data-testid="stColumns"] > div[data-testid="stColumn"]:nth-of-type(1) { width: 50px !important; min-width: 50px !important; max-width: 50px !important; }
+    div.nav-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(2),
+    div.nav-marker + div[data-testid="stColumns"] > div[data-testid="stColumn"]:nth-of-type(2) { width: 100px !important; min-width: 100px !important; max-width: 100px !important; }
+    div.nav-marker + div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"]:nth-of-type(3),
+    div.nav-marker + div[data-testid="stColumns"] > div[data-testid="stColumn"]:nth-of-type(3) { width: 50px !important; min-width: 50px !important; max-width: 50px !important; }
 
-    /* 버튼 고유의 최소 너비를 파괴하고 내부 텍스트 라인 높이까지 중앙 정렬 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button {
+    /* 버튼 고유의 패딩을 지우고 텍스트 정중앙 배치 */
+    div.nav-marker + div[data-testid="stHorizontalBlock"] button,
+    div.nav-marker + div[data-testid="stColumns"] button {
         width: 100% !important; min-width: unset !important; max-width: unset !important;
         height: 38px !important; font-size: 15px !important; font-weight: bold !important; padding: 0 !important;
         background-color: white !important; border: 1px solid #cbd5e1 !important; color: #334155 !important;
         border-radius: 8px !important; white-space: nowrap !important;
         display: flex !important; align-items: center !important; justify-content: center !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button p {
-        margin: 0 !important; padding: 0 !important; line-height: 1 !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover { border-color: #007AFF !important; color: #007AFF !important; }
+    div.nav-marker + div[data-testid="stHorizontalBlock"] button p,
+    div.nav-marker + div[data-testid="stColumns"] button p { margin: 0 !important; padding: 0 !important; line-height: 1 !important; }
+    div.nav-marker + div[data-testid="stHorizontalBlock"] button:hover,
+    div.nav-marker + div[data-testid="stColumns"] button:hover { border-color: #007AFF !important; color: #007AFF !important; }
 
-    /* 숫자 카운터 박스 스타일 수직 균형 미세 조정 */
+    /* 숫자 카운터 공백 및 수직 균형 매칭 */
     .m-nav-counter {
         display: flex !important; align-items: center !important; justify-content: center !important;
         height: 38px; background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px;
@@ -123,7 +125,7 @@ st.markdown("""
     }
     .stButton > button[key^="save_slide_"]:hover { background-color: #007AFF !important; color: #ffffff !important; }
     
-    .nav-marker { display: none; }
+    .nav-marker { display: none !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -246,10 +248,10 @@ with tab_search:
         st.markdown("**📜 상세 메모**")
         new_memo = st.text_area("내용 수정", value=item["특약사항"], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
         
-        # 💡 [50px - 100px - 50px 수직 정렬 정밀 타격 배치]
+        # 💡 [구조 변경] 마커용 HTML 태그를 컬럼 밖으로 완전히 분리하여 수평 균형 정렬 달성
+        st.markdown("<div class='nav-marker'></div>", unsafe_allow_html=True)
         nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
         with nav_col1:
-            st.markdown("<span class='nav-marker'></span>", unsafe_allow_html=True) 
             if st.button("◀", key="btn_nav_prev", use_container_width=True):
                 st.session_state.current_idx = (cur - 1) % total_count
                 st.rerun()
