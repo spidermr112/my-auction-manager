@@ -100,102 +100,16 @@ def process_area(input_str):
     return p, f"{p}평"
 
 
-# 🔄 상단에 쾌적한 탭 메뉴 구성 (조회와 등록을 완전히 분리!)
-tab_search, tab_register = st.tabs(["🔍 매물 조회 및 브리핑", "➕ 신규 매물 등록"])
+# 🔄 요청하신 순서대로 3단 탭 구성 변경!
+tab_register, tab_list, tab_search = st.tabs([
+    "➕ 신규 매물 등록", 
+    "📋 전체 목록 현황", 
+    "🔍 매물 검색 및 브리핑"
+])
 
 
 # ==========================================
-# TAB 1: 매물 조회 및 브리핑 탭
-# ==========================================
-with tab_search:
-    col_top1, col_top2 = st.columns([8, 2])
-    with col_top2:
-        st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True, key="btn_reset_tab1")
-
-    # 통합 필터 바
-    st.subheader("🔍 통합 검색 필터")
-    filter_row = st.container(border=True)
-    with filter_row:
-        c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
-        with c1: search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
-        with c2: f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
-        with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
-        with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
-
-    df_filtered = df_list.copy()
-    if not df_filtered.empty:
-        df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
-        if '대분류' in df_filtered.columns:
-            df_filtered = df_filtered[df_filtered['대분류'].isin(f_main_cat)]
-        if search_q:
-            df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
-
-    # 목록 표시
-    st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
-    edited_df = st.data_editor(
-        df_filtered,
-        use_container_width=True,
-        hide_index=False,
-        column_config={
-            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-            "특약사항": None
-        },
-        column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
-    )
-
-    # 상세 브리핑 영역
-    if not df_filtered.empty:
-        st.markdown("---")
-        st.subheader("📋 매물 상세 브리핑")
-
-        if "current_idx" not in st.session_state:
-            st.session_state.current_idx = 0
-
-        filtered_indices = df_filtered.index.tolist()
-        total_count = len(filtered_indices)
-        
-        if st.session_state.current_idx >= total_count:
-            st.session_state.current_idx = 0
-
-        item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
-        
-        with st.container(border=True):
-            st.info(f"📍 **{item['소재지']}**")
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                st.write(f"🏠 **종류:** {item['소분류']} ({item['상태']})")
-                st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
-            with sc2:
-                st.write(f"📏 **면적:** {item['면적']}")
-                st.write(f"👤 **고객:** {item['고객명']}")
-            
-            st.write(f"📞 **연락처:** {item['연락처']}")
-            st.markdown("**📜 상세 메모**")
-            
-            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
-            
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
-            with nav_col1:
-                st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-                if st.button("◀ 이전", key="btn_nav_prev"):
-                    st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-                    st.rerun()
-            with nav_col2:
-                st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
-            with nav_col3:
-                if st.button("다음 ▶", key="btn_nav_next"):
-                    st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
-                    st.rerun()
-
-            if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
-                df_list.at[item.name, '특약사항'] = new_memo
-                conn.update(data=df_list)
-                st.toast("저장 완료!")
-                st.rerun()
-
-
-# ==========================================
-# TAB 2: 신규 매물 등록 탭
+# 1번째 탭: 신규 매물 등록
 # ==========================================
 with tab_register:
     st.subheader("➕ 신규 매물 등록 시스템")
@@ -241,4 +155,101 @@ with tab_register:
                 st.success("🎉 새로운 매물이 구글 시트에 완벽하게 기록되었습니다!")
                 
                 # 저장 후 등록 입력 폼 비우기 위해 리런
+                st.rerun()
+
+
+# ==========================================
+# 2번째 탭: 전체 목록 현황
+# ==========================================
+with tab_list:
+    st.subheader(f"📋 등록 매물 목록 ({len(df_list)}건)")
+    
+    # 탭 1에서 새로 등록된 내용을 즉각 반영하여 전체 리스트를 깔끔한 정렬 순서로 표출
+    st.data_editor(
+        df_list,
+        use_container_width=True,
+        hide_index=False,
+        column_config={
+            "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "특약사항": None  # 목록 표에서는 메모 공간 제외
+        },
+        column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
+    )
+
+
+# ==========================================
+# 3번째 탭: 매물 검색 및 브리핑
+# ==========================================
+with tab_search:
+    col_top1, col_top2 = st.columns([8, 2])
+    with col_top2:
+        st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True, key="btn_reset_tab1")
+
+    # 통합 필터 바
+    st.subheader("🔍 통합 검색 필터")
+    filter_row = st.container(border=True)
+    with filter_row:
+        c1, c2, c3, c4 = st.columns([1.5, 1, 1, 1])
+        with c1: search_q = st.text_input("📍 검색어", placeholder="주소, 고객명...", key="f_search")
+        with c2: f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
+        with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
+        with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
+
+    df_filtered = df_list.copy()
+    if not df_filtered.empty:
+        df_filtered = df_filtered[df_filtered['상태'].isin(status_list)]
+        if '대분류' in df_filtered.columns:
+            df_filtered = df_filtered[df_filtered['대분류'].isin(f_main_cat)]
+        if search_q:
+            df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
+
+    # 상세 브리핑 영역
+    if df_filtered.empty:
+        st.warning("⚠️ 검색 조건에 맞는 매물이 없습니다. 필터를 조정해 주세요.")
+    else:
+        st.subheader(f"📋 매물 상세 브리핑 (필터 결과: {len(df_filtered)}건)")
+
+        if "current_idx" not in st.session_state:
+            st.session_state.current_idx = 0
+
+        filtered_indices = df_filtered.index.tolist()
+        total_count = len(filtered_indices)
+        
+        if st.session_state.current_idx >= total_count:
+            st.session_state.current_idx = 0
+
+        item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
+        
+        with st.container(border=True):
+            st.info(f"📍 **{item['소재지']}**")
+            sc1, sc2 = st.columns(2)
+            with sc1:
+                st.write(f"🏠 **종류:** {item['소분류']} ({item['상태']})")
+                st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
+            with sc2:
+                st.write(f"📏 **면적:** {item['면적']}")
+                st.write(f"👤 **고객:** {item['고객명']}")
+            
+            st.write(f"📞 **연락처:** {item['연락처']}")
+            st.markdown("**📜 상세 메모**")
+            
+            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
+            
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+            with nav_col1:
+                st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
+                if st.button("◀ 이전", key="btn_nav_prev"):
+                    st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
+                    st.rerun()
+            with nav_col2:
+                st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
+            with nav_col3:
+                if st.button("다음 ▶", key="btn_nav_next"):
+                    st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
+                    st.rerun()
+
+            if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
+                df_list.at[item.name, '특약사항'] = new_memo
+                conn.update(data=df_list)
+                st.toast("저장 완료!")
                 st.rerun()
