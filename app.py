@@ -31,7 +31,7 @@ st.markdown("""
         padding: 10px 15px !important;
     }
     
-    /* 💡 [대표님 아이디어 반영] 전체 조작 바를 가로 450px로 제한하고 정중앙 정렬 */
+    /* 💡 [50px - 100px - 50px] 전체 조작 바를 정확히 총 가로 200px로 묶고 정중앙 정렬 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker),
     div[data-testid="stColumns"]:has(.nav-marker) {
         display: flex !important;
@@ -39,45 +39,45 @@ st.markdown("""
         flex-wrap: nowrap !important;
         justify-content: center !important;
         align-items: center !important;
-        gap: 8px !important;
-        width: 450px !important;
-        max-width: 100% !important; /* 화면이 450px보다 작은 초소형 폰 대응 */
-        margin: 20px auto !important; /* 상하 여백 주고 좌우 자동(auto)으로 가운데 배치 */
+        gap: 6px !important;
+        width: 200px !important;
+        max-width: 100% !important;
+        margin: 20px auto !important;
     }
     
-    /* 💡 1번째 칸 (이전 버튼): 정확히 100px 고정 */
+    /* 💡 1번째 칸 (이전 버튼): 정확히 50px 박제 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(1),
     div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(1) {
-        width: 100px !important;
-        min-width: 100px !important;
-        max-width: 100px !important;
-        flex: 0 0 100px !important;
+        width: 50px !important;
+        min-width: 50px !important;
+        max-width: 50px !important;
+        flex: 0 0 50px !important;
     }
     
-    /* 💡 2번째 칸 (카운터): 정확히 250px 고정 */
+    /* 💡 2번째 칸 (카운터 숫자가 뜨는 곳): 정확히 100px 박제 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(2),
     div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(2) {
-        width: 250px !important;
-        min-width: 250px !important;
-        max-width: 250px !important;
-        flex: 0 0 250px !important;
-    }
-    
-    /* 💡 3번째 칸 (다음 버튼): 정확히 100px 고정 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(3),
-    div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(3) {
         width: 100px !important;
         min-width: 100px !important;
         max-width: 100px !important;
         flex: 0 0 100px !important;
     }
+    
+    /* 💡 3번째 칸 (다음 버튼): 정확히 50px 박제 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(3),
+    div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(3) {
+        width: 50px !important;
+        min-width: 50px !important;
+        max-width: 50px !important;
+        flex: 0 0 50px !important;
+    }
 
-    /* 내비게이션 내부 버튼 터치 스타일 */
+    /* 내비게이션 내부 화살표 버튼 터치 스타일 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) button,
     div[data-testid="stColumns"]:has(.nav-marker) button {
         width: 100% !important;
         height: 38px !important;
-        font-size: 14px !important;
+        font-size: 15px !important;
         font-weight: bold !important;
         padding: 0 !important;
         background-color: white !important;
@@ -97,7 +97,7 @@ st.markdown("""
         font-family: 'Inter', sans-serif;
         font-weight: 700;
         color: #303133;
-        font-size: 14px;
+        font-size: 13px;
         line-height: 36px;
         text-align: center;
         background-color: #f1f5f9;
@@ -275,17 +275,17 @@ with tab_search:
             
             new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
             
-            # 💡 [100px - 250px - 100px 분할 배치]
+            # 💡 [50px - 100px - 50px 컴팩트 분할 레이아웃 완료]
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
             with nav_col1:
                 st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-                if st.button("◀ 이전", key="btn_nav_prev"):
+                if st.button("◀", key="btn_nav_prev"):
                     st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
                     st.rerun()
             with nav_col2:
                 st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
             with nav_col3:
-                if st.button("다음 ▶", key="btn_nav_next"):
+                if st.button("▶", key="btn_nav_next"):
                     st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
                     st.rerun()
 
