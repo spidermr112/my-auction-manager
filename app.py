@@ -101,13 +101,13 @@ with st.expander("➕ 새 매물 등록", expanded=False):
         reg_date = st.date_input("접수일", datetime.today(), key="reg_date")
         client_name = st.text_input("고객명", key="reg_name")
         
-        # 💡 힌트 안내문(placeholder) 추가
-        client_phone = st.text_input("연락처", placeholder="010-    -    (숫자만 입력 가능)", key="reg_phone")
+        # 💡 흐릿한 가이드 텍스트(placeholder) 추가
+        client_phone = st.text_input("연락처", placeholder="010-    -    (숫자만 쳐도 무관)", key="reg_phone")
         
-        # 💡 숫자가 입력되면 실시간으로 어떻게 저장될지 예측 포맷 보여주기
+        # 💡 숫자가 입력되면 어떻게 변환되어 저장될지 실시간으로 보여주는 알림판
         if client_phone:
             preview_phone = format_phone_number(client_phone)
-            st.caption(f"ℹ️ 저장 예정: `{preview_phone}`")
+            st.caption(f"ℹ️ 저장 예정 포맷: `{preview_phone}`")
             
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, key="reg_main")
     with col2:
@@ -123,12 +123,22 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
     if st.button("🏠 구글 시트에 저장", use_container_width=True):
         _, py_display = process_area(area_text)
+        
+        # 💡 저장 직전에 입력된 연락처를 변환 함수로 처리합니다!
         formatted_phone = format_phone_number(client_phone)
         
         new_entry = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"), "고객명": client_name, "연락처": formatted_phone, 
-            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-            "가액": price, "월세": rent, "상태": "진행중", "소재지": addr, "특약사항": memo
+            "접수일": reg_date.strftime("%Y-%m-%d"), 
+            "고객명": client_name, 
+            "연락처": formatted_phone,  # 💡 이제 진짜 변환된 값으로 구글시트에 꽂힙니다.
+            "대분류": main_cat, 
+            "소분류": sub_cat, 
+            "면적": py_display, 
+            "가액": price, 
+            "월세": rent, 
+            "상태": "진행중", 
+            "소재지": addr, 
+            "특약사항": memo
         }])
         updated_df = pd.concat([new_entry, df_list], ignore_index=True)
         conn.update(data=updated_df)
@@ -155,7 +165,7 @@ if not df_filtered.empty:
     if search_q:
         df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
 
-# 4. 목록 표시
+# 4. 목록 표시 (순서: 상태 ➔ 소분류 ➔ 소재지 ➔ 면적 ➔ 가액 ➔ 월세 ➔ 고객명 ➔ 연락처)
 st.subheader(f"📋 매물 목록 ({len(df_filtered)}건)")
 edited_df = st.data_editor(
     df_filtered,
