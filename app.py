@@ -17,12 +17,12 @@ def format_phone_number(input_str):
         return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
     return input_str
 
-# 1. 페이지 설정 및 모바일 최적화 CSS
+# 1. 페이지 설정 및 모바일 최적화/디자인 강화 CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #fcfcfc; }
+    .stApp { background-color: #f8fafc; }
     
     /* 탭 메뉴 디자인 세련되게 변경 */
     button[data-baseweb="tab"] {
@@ -31,34 +31,62 @@ st.markdown("""
         padding: 10px 15px !important;
     }
     
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
-        display: flex !important;
-        flex-direction: row !important;
-        justify-content: center !important;
-        align-items: center !important;
-        gap: 0px !important;
-        width: fit-content !important;
-        margin: 10px auto !important;
-        padding: 0 !important;
+    /* 💡 브리핑 카드 디자인 전면 업그레이드 */
+    .briefing-card {
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 16px !important;
+        padding: 24px !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+        margin-bottom: 20px !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
-        flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; padding: 0 !important;
-    }
-    .stButton > button[key^="btn_nav_"] {
-        border: 1px solid #dcdfe6 !important; background: white !important; color: #606266 !important;
-        font-weight: 700 !important; font-size: 14px !important; height: 36px !important;
-        padding: 0 15px !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        transition: all 0.2s !important;
-    }
-    .stButton > button[key^="btn_nav_"]:hover { border-color: #007AFF !important; color: #007AFF !important; background-color: #f0f7ff !important; }
-    .nav-counter { font-family: 'Inter', sans-serif; font-weight: 700; color: #303133; font-size: 15px; line-height: 36px; padding: 0 15px; text-align: center; }
-    .nav-marker { display: none; }
     
-    .stButton > button[key^="save_slide_"] {
-        margin-top: 5px !important; height: 42px !important; border-radius: 8px !important;
-        font-weight: 600 !important; background-color: #ffffff !important; border: 1px solid #007AFF !important; color: #007AFF !important;
+    .briefing-header {
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%) !important;
+        color: white !important;
+        padding: 14px 20px !important;
+        border-radius: 12px !important;
+        font-size: 18px !important;
+        font-weight: bold !important;
+        margin-bottom: 20px !important;
+        display: flex;
+        align-items: center;
+        gap: 10px;
     }
-    .stButton > button[key^="save_slide_"]:hover { background-color: #007AFF !important; color: #ffffff !important; }
+    
+    /* 하단 저장 버튼 디자인 내추럴하게 변경 */
+    .stButton > button[key^="save_slide_"] {
+        margin-top: 15px !important;
+        height: 45px !important;
+        border-radius: 10px !important;
+        font-weight: bold !important;
+        background-color: #3b82f6 !important;
+        color: #ffffff !important;
+        border: none !important;
+        box-shadow: 0 4px 6px rgba(59, 130, 246, 0.2) !important;
+    }
+    .stButton > button[key^="save_slide_"]:hover {
+        background-color: #1d4ed8 !important;
+    }
+    
+    /* 내비게이션 버튼 콤팩트화 */
+    .stButton > button[key^="btn_nav_"] {
+        border: 1px solid #cbd5e1 !important;
+        background: #ffffff !important;
+        color: #334155 !important;
+        font-weight: bold !important;
+        height: 38px !important;
+        border-radius: 8px !important;
+    }
+    
+    .nav-counter {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: #1e293b;
+        font-size: 16px;
+        line-height: 38px;
+        text-align: center;
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,14 +127,12 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-
 # 🔄 3단 탭 구성
 tab_register, tab_list, tab_search = st.tabs([
     "➕ 신규등록", 
     "📋 전체목록", 
     "🔍 목록검색"
 ])
-
 
 # ==========================================
 # 1번째 탭: ➕ 신규등록
@@ -155,7 +181,6 @@ with tab_register:
                 st.success("🎉 새로운 매물이 구글 시트에 완벽하게 기록되었습니다!")
                 st.rerun()
 
-
 # ==========================================
 # 2번째 탭: 📋 전체목록
 # ==========================================
@@ -173,14 +198,10 @@ with tab_list:
         column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
     )
 
-
 # ==========================================
 # 3번째 탭: 🔍 목록검색
 # ==========================================
 with tab_search:
-    # 💡 상단에 불필요하게 붕 떠있던 검색 초기화 버튼을 제거하여 레이아웃을 깔끔하게 정리했습니다.
-
-    # 통합 필터 바
     st.subheader("🔍 통합 검색 필터")
     filter_row = st.container(border=True)
     with filter_row:
@@ -190,7 +211,6 @@ with tab_search:
         with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
         with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
         
-        # 💡 [구조 개선] 사용자의 시선 흐름에 맞춰 필터 박스 맨 우측 하단에 자연스럽게 배치
         st.markdown("<div style='text-align: right; margin-top: 10px;'>", unsafe_allow_html=True)
         if st.button("🔄 검색 조건 초기화", use_container_width=True, key="btn_reset_tab1"):
             reset_all()
@@ -204,7 +224,6 @@ with tab_search:
         if search_q:
             df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
 
-    # 상세 브리핑 영역
     if df_filtered.empty:
         st.warning("⚠️ 검색 조건에 맞는 매물이 없습니다. 필터를 조정해 주세요.")
     else:
@@ -221,36 +240,41 @@ with tab_search:
 
         item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
         
+        # 💡 [디자인 업그레이드] 하나의 수려한 카드로 브리핑 영역 묶기
+        st.markdown(f"""
+            <div class="briefing-card">
+                <div class="briefing-header">📍 {item['소재지']}</div>
+            </div>
+        """, unsafe_allow_html=True)
+        
+        # 정보 배치 레이아웃 구조 개선
         with st.container(border=True):
-            st.info(f"📍 **{item['소재지']}**")
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                st.write(f"🏠 **종류:** {item['소분류']} ({item['상태']})")
-                st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
-            with sc2:
-                st.write(f"📏 **면적:** {item['면적']}")
-                st.write(f"👤 **고객:** {item['고객명']}")
+            info_col1, info_col2 = st.columns(2)
+            with info_col1:
+                st.markdown(f"🏠 **물건종류:** {item['소분류']} `({item['상태']})`")
+                st.markdown(f"💰 **거래가액:** <span style='color:#ef4444; font-weight:bold;'>{item['가액']}</span> / {item['월세']}", unsafe_allow_html=True)
+            with info_col2:
+                st.markdown(f"📏 **공급/전용면적:** {item['면적']}")
+                st.markdown(f"👤 **소유자/세입자:** {item['고객명']} (📞 {item['연락처']})")
             
-            st.write(f"📞 **연락처:** {item['연락처']}")
-            st.markdown("**📜 상세 메모**")
+            st.markdown("<br>📋 **상세 특약 및 비밀번호 메모**", unsafe_allow_html=True)
+            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=180, key=f"memo_slide_{item.name}", label_visibility="collapsed")
             
-            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
-            
-            nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+            # 💡 조작 내비게이션 바와 저장 버튼을 메모장 바로 밑으로 유기적 배치
+            nav_col1, nav_col2, nav_col3 = st.columns([1.2, 1, 1.2])
             with nav_col1:
-                st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
-                if st.button("◀ 이전", key="btn_nav_prev"):
+                if st.button("◀ 이전 매물", key="btn_nav_prev", use_container_width=True):
                     st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
                     st.rerun()
             with nav_col2:
                 st.markdown(f"<div class='nav-counter'>{st.session_state.current_idx + 1} / {total_count}</div>", unsafe_allow_html=True)
             with nav_col3:
-                if st.button("다음 ▶", key="btn_nav_next"):
+                if st.button("다음 매물 ▶", key="btn_nav_next", use_container_width=True):
                     st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
                     st.rerun()
-
-            if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
+                    
+            if st.button("💾 위 수정된 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
                 df_list.at[item.name, '특약사항'] = new_memo
                 conn.update(data=df_list)
-                st.toast("저장 완료!")
+                st.toast("메모가 안전하게 저장되었습니다!")
                 st.rerun()
