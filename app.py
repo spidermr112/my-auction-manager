@@ -85,21 +85,6 @@ button[data-testid="stBaseButton-secondary"][key^="save_slide_"]:hover {
 """, unsafe_allow_html=True)
 
 
-# ─────────────────────────────────────────
-# query_params 로 네비게이션 처리
-# (HTML 버튼 → URL ?nav=prev/next → Streamlit 감지 → 인덱스 변경)
-# ─────────────────────────────────────────
-
-nav_action = st.query_params.get("nav", None)
-if nav_action in ("prev", "next"):
-    if "current_idx" not in st.session_state:
-        st.session_state.current_idx = 0
-    # 실제 인덱스 변경은 total_count를 알아야 해서
-    # 여기선 방향만 저장하고 렌더링 시점에 처리
-    st.session_state.nav_pending = nav_action
-    st.query_params.clear()
-    st.rerun()
-
 
 # ─────────────────────────────────────────
 # 구글 시트 연결 & 데이터 로드
@@ -255,14 +240,6 @@ with tab_search:
     indices     = df_filtered.index.tolist()
     total_count = len(indices)
 
-    # nav_pending: query_params에서 넘어온 방향 처리
-    if "nav_pending" in st.session_state:
-        direction = st.session_state.pop("nav_pending")
-        if direction == "prev":
-            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
-        else:
-            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
-
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
 
@@ -297,74 +274,71 @@ with tab_search:
         )
 
         # ── 네비게이션 바 ──────────────────────────────────────
-        # st.columns 대신 st.components.v1.html() 사용
-        # → 모바일/PC 모두 항상 한 줄 flexbox 유지
-        # → 버튼 클릭 시 ?nav=prev/next 파라미터로 Streamlit에 신호
+        # 구조: 예쁜 HTML 바(시각) + 숨긴 Streamlit 버튼(동작)
+        # JS가 숨긴 버튼을 직접 클릭 → Streamlit 이벤트 정상 발생
+        # st.columns 없이 HTML flexbox → 모바일도 항상 한 줄
         # ────────────────────────────────────────────────────────
         import streamlit.components.v1 as components
 
-        components.html(
-            f"""
-            <style>
-              * {{ margin:0; padding:0; box-sizing:border-box; font-family: sans-serif; }}
-              .nav-wrap {{
-                display: flex;
-                align-items: center;
-                gap: 6px;
-                background: #f0f2f6;
-                border: 1px solid #dde1e9;
-                border-radius: 10px;
-                padding: 4px 6px;
-                height: 52px;
-              }}
-              .nav-btn {{
-                flex: 0 0 80px;
-                height: 44px;
-                background: white;
-                border: 1px solid #d0d5dd;
-                border-radius: 8px;
-                font-size: 16px;
-                font-weight: 700;
-                color: #31333f;
-                cursor: pointer;
-                -webkit-tap-highlight-color: transparent;
-                touch-action: manipulation;
-              }}
-              .nav-btn:active {{
-                background: #007AFF;
-                color: white;
-                border-color: #007AFF;
-              }}
-              .nav-count {{
-                flex: 1;
-                text-align: center;
-                font-size: 17px;
-                font-weight: 700;
-                color: #31333f;
-              }}
-              .nav-count span {{
-                font-size: 13px;
-                font-weight: 400;
-                color: #999;
-                margin: 0 3px;
-              }}
-            </style>
-            <div class="nav-wrap">
-              <button class="nav-btn" onclick="navigate('prev')">◀ 이전</button>
-              <div class="nav-count">{cur + 1}<span>/</span>{total_count}</div>
-              <button class="nav-btn" onclick="navigate('next')">다음 ▶</button>
-            </div>
-            <script>
-              function navigate(dir) {{
-                // 부모 Streamlit 페이지의 URL에 ?nav=prev/next 를 추가해 리로드
-                const url = new URL(window.parent.location.href);
-                url.searchParams.set('nav', dir);
-                window.parent.location.href = url.toString();
-              }}
-            </script>
-            """,
-            height=60,
-        )
+        # 1) 예쁜 HTML 네비게이션 바
+        st.markdown(f"""
+        <div style="
+            display:flex; align-items:center; gap:6px;
+            background:#f0f2f6; border:1px solid #dde1e9;
+            border-radius:10px; padding:4px 6px; height:52px;
+            margin: 8px 0 0;
+        ">
+            <button onclick="clickHidden('btn_nav_prev')" style="
+                flex:0 0 80px; height:44px; background:white;
+                border:1px solid #d0d5dd; border-radius:8px;
+                font-size:16px; font-weight:700; color:#31333f;
+                cursor:pointer; touch-action:manipulation;
+            ">◀ 이전</button>
+            <div style="
+                flex:1; text-align:center;
+                font-size:17px; font-weight:700; color:#31333f;
+            ">{cur + 1} <span style="font-size:13px;font-weight:400;color:#999;margin:0 2px">/</span> {total_count}</div>
+            <button onclick="clickHidden('btn_nav_next')" style="
+                flex:0 0 80px; height:44px; background:white;
+                border:1px solid #d0d5dd; border-radius:8px;
+                font-size:16px; font-weight:700; color:#31333f;
+                cursor:pointer; touch-action:manipulation;
+            ">다음 ▶</button>
+        </div>
+        <script>
+        function clickHidden(key) {{
+            // Streamlit 숨긴 버튼을 key로 찾아 클릭
+            const btns = window.parent.document.querySelectorAll('button');
+            for (const b of btns) {{
+                if (b.innerText.trim() === '◀' && key === 'btn_nav_prev') {{ b.click(); break; }}
+                if (b.innerText.trim() === '▶' && key === 'btn_nav_next') {{ b.click(); break; }}
+            }}
+        }}
+        </script>
+        """, unsafe_allow_html=True)
+
+        # 2) 실제 동작하는 숨긴 Streamlit 버튼 (CSS로 안 보이게)
+        st.markdown("""
+        <style>
+        button[data-testid="stBaseButton-secondary"][key="btn_nav_prev"],
+        button[data-testid="stBaseButton-secondary"][key="btn_nav_next"] {
+            position: absolute !important;
+            width: 1px !important; height: 1px !important;
+            overflow: hidden !important; opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        col_prev, col_next = st.columns(2)
+        with col_prev:
+            if st.button("◀", key="btn_nav_prev", use_container_width=True):
+                st.session_state.current_idx = (cur - 1) % total_count
+                st.rerun()
+        with col_next:
+            if st.button("▶", key="btn_nav_next", use_container_width=True):
+                st.session_state.current_idx = (cur + 1) % total_count
+                st.rerun()
 
         # 메모 저장
         if st.button("💾 메모 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
