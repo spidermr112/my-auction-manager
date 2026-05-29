@@ -31,34 +31,57 @@ st.markdown("""
         padding: 10px 15px !important;
     }
     
+    /* 💡 [치트키] 모바일 기기에서도 무조건 세로 적층을 막고 한 줄로 강제 고정 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-direction: row !important;
+        flex-wrap: nowrap !important;
         justify-content: center !important;
         align-items: center !important;
-        gap: 0px !important;
-        width: fit-content !important;
-        margin: 10px auto !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+    
+    /* 하위 컬럼 자식 노드들의 모바일 반응형 100% 너비 강제 해제 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div {
+        width: auto !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
         padding: 0 !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
-        flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; padding: 0 !important;
+
+    /* 내비게이션 내부 버튼 전체 디자인 제어 (존재하지 않는 key 매칭 제거) */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button {
+        width: 100% !important;
+        height: 38px !important;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        padding: 0 !important;
+        background-color: white !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #334155 !important;
+        border-radius: 8px !important;
     }
-    .stButton > button[key^="btn_nav_"] {
-        border: 1px solid #dcdfe6 !important; background: white !important; color: #606266 !important;
-        font-weight: 700 !important; font-size: 14px !important; height: 36px !important;
-        padding: 0 15px !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
-        transition: all 0.2s !important;
-    }
-    .stButton > button[key^="btn_nav_"]:hover { border-color: #007AFF !important; color: #007AFF !important; background-color: #f0f7ff !important; }
-    .nav-counter { font-family: 'Inter', sans-serif; font-weight: 700; color: #303133; font-size: 15px; line-height: 36px; padding: 0 15px; text-align: center; }
-    .nav-marker { display: none; }
     
-    .stButton > button[key^="save_slide_"] {
-        margin-top: 5px !important; height: 42px !important; border-radius: 8px !important;
-        font-weight: 600 !important; background-color: #ffffff !important; border: 1px solid #007AFF !important; color: #007AFF !important;
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover {
+        border-color: #007AFF !important;
+        color: #007AFF !important;
     }
-    .stButton > button[key^="save_slide_"]:hover { background-color: #007AFF !important; color: #ffffff !important; }
+
+    .nav-counter {
+        font-family: 'Inter', sans-serif;
+        font-weight: 700;
+        color: #303133;
+        font-size: 14px;
+        line-height: 36px;
+        text-align: center;
+        background-color: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        height: 38px;
+    }
+    
+    .nav-marker { display: none; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -99,14 +122,12 @@ def process_area(input_str):
     p = int(val) if "평" in input_str else int(round(val * 0.3025))
     return p, f"{p}평"
 
-
 # 🔄 3단 탭 구성
 tab_register, tab_list, tab_search = st.tabs([
     "➕ 신규등록", 
     "📋 전체목록", 
     "🔍 목록검색"
 ])
-
 
 # ==========================================
 # 1번째 탭: ➕ 신규등록
@@ -155,7 +176,6 @@ with tab_register:
                 st.success("🎉 새로운 매물이 구글 시트에 완벽하게 기록되었습니다!")
                 st.rerun()
 
-
 # ==========================================
 # 2번째 탭: 📋 전체목록
 # ==========================================
@@ -173,14 +193,10 @@ with tab_list:
         column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
     )
 
-
 # ==========================================
 # 3번째 탭: 🔍 목록검색
 # ==========================================
 with tab_search:
-    # 💡 상단에 불필요하게 붕 떠있던 검색 초기화 버튼을 제거하여 레이아웃을 깔끔하게 정리했습니다.
-
-    # 통합 필터 바
     st.subheader("🔍 통합 검색 필터")
     filter_row = st.container(border=True)
     with filter_row:
@@ -190,7 +206,6 @@ with tab_search:
         with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
         with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
         
-        # 💡 [구조 개선] 사용자의 시선 흐름에 맞춰 필터 박스 맨 우측 하단에 자연스럽게 배치
         st.markdown("<div style='text-align: right; margin-top: 10px;'>", unsafe_allow_html=True)
         if st.button("🔄 검색 조건 초기화", use_container_width=True, key="btn_reset_tab1"):
             reset_all()
@@ -204,7 +219,6 @@ with tab_search:
         if search_q:
             df_filtered = df_filtered[df_filtered['소재지'].str.contains(search_q, na=False) | df_filtered['고객명'].str.contains(search_q, na=False)]
 
-    # 상세 브리핑 영역
     if df_filtered.empty:
         st.warning("⚠️ 검색 조건에 맞는 매물이 없습니다. 필터를 조정해 주세요.")
     else:
@@ -236,6 +250,7 @@ with tab_search:
             
             new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
             
+            # 💡 [핵심 교정 공간] .nav-marker 클래스로 이 감싸진 수평 블록을 정확하게 명중시킵니다.
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
             with nav_col1:
                 st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
