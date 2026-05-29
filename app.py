@@ -177,11 +177,11 @@ with tab_list:
 # ==========================================
 # 3번째 탭: 🔍 목록검색
 # ==========================================
-with tab_search:
-    col_top1, col_top2 = st.columns([8, 2])
-    with col_top2:
-        st.button("🔄 검색 초기화", on_click=reset_all, use_container_width=True, key="btn_reset_tab1")
-
+with col_top2:
+    # 💡 on_click을 제거하고 if문 방식으로 안전하게 분리합니다.
+    if st.button("🔄 검색 초기화", use_container_width=True, key="btn_reset_tab1"):
+        reset_all()
+    
     # 통합 필터 바
     st.subheader("🔍 통합 검색 필터")
     filter_row = st.container(border=True)
