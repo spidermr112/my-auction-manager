@@ -184,15 +184,19 @@ edited_df = st.data_editor(
     hide_index=False,
     column_config={
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-        "특약사항": None 
+        "특약사항": None  # 특약사항(메모)은 표에서 제외
     },
-    column_order=["상태", "소재지", "소분류", "가액", "월세", "면적", "고객명", "연락처"]
+    column_order=[
+        "상태", 
+        "소분류", 
+        "소재지", 
+        "면적", 
+        "가액", 
+        "월세", 
+        "고객명", 
+        "연락처"
+    ]
 )
-
-if st.button("💾 변경사항 저장", key="save_main_df", use_container_width=True):
-    conn.update(data=edited_df)
-    st.toast("저장되었습니다!")
-    st.rerun()
 
 # --- 5. [상세 브리핑 영역] 순서 최적화 ---
 if not df_filtered.empty:
