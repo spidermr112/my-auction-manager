@@ -26,7 +26,7 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
     .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
     
-    /* 탭 메뉴: 요즘 트렌디한 플랫  Chiclet 스타일 */
+    /* 탭 메뉴 디자인 */
     button[data-baseweb="tab"] {
         font-size: 14px !important;
         font-weight: 600 !important;
@@ -39,43 +39,48 @@ st.markdown("""
         color: #0284c7 !important;
     }
     
-    /* 💡 [대표님 기획 반영] 50px - 100px - 50px 초정밀 가로 200px 중앙 정렬 락인 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker),
-    div[data-testid="stColumns"]:has(.nav-marker) {
+    /* 💡 [치트키] 모바일 강제 적층을 차단하고 가로 212px(50+100+50+여백)로 중앙 박제 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         justify-content: center !important;
         align-items: center !important;
         gap: 6px !important;
-        width: 200px !important;
-        max-width: 100% !important;
-        margin: 24px auto 10px auto !important;
+        width: 212px !important;
+        min-width: 212px !important;
+        margin: 20px auto !important;
     }
     
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(1),
-    div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(1) {
-        width: 50px !important; min-width: 50px !important; max-width: 50px !important; flex: 0 0 50px !important;
+    /* 💡 껍데기를 우회하여 스트림릿 실제 컬럼(stColumn)을 순서대로 강제 지정 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="stColumn"] {
+        flex: none !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(2),
-    div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(2) {
-        width: 100px !important; min-width: 100px !important; max-width: 100px !important; flex: 0 0 100px !important;
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="stColumn"]:nth-of-type(1) {
+        width: 50px !important; min-width: 50px !important; max-width: 50px !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(3),
-    div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(3) {
-        width: 50px !important; min-width: 50px !important; max-width: 50px !important; flex: 0 0 50px !important;
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="stColumn"]:nth-of-type(2) {
+        width: 100px !important; min-width: 100px !important; max-width: 100px !important;
+    }
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="stColumn"]:nth-of-type(3) {
+        width: 50px !important; min-width: 50px !important; max-width: 50px !important;
     }
 
-    /* 슬림 내비게이션 화살표 버튼 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button,
-    div[data-testid="stColumns"]:has(.nav-marker) button {
-        width: 100% !important; height: 36px !important; font-size: 14px !important; font-weight: bold !important;
-        padding: 0 !important; background-color: #ffffff !important; border: 1px solid #cbd5e1 !important;
-        color: #334155 !important; border-radius: 8px !important; white-space: nowrap !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+    /* 💡 버튼 내부의 기본 패딩과 너비 제한을 완전히 파괴 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button {
+        width: 100% !important;
+        min-width: 100% !important;
+        height: 36px !important;
+        font-size: 14px !important;
+        font-weight: bold !important;
+        padding: 0 !important; /* 글자가 팅겨나가지 않게 패딩 제로화 */
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #334155 !important;
+        border-radius: 8px !important;
+        white-space: nowrap !important;
     }
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover,
-    div[data-testid="stColumns"]:has(.nav-marker) button:hover {
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover {
         border-color: #0284c7 !important; color: #0284c7 !important; background-color: #f0f9ff !important;
     }
 
@@ -85,7 +90,7 @@ st.markdown("""
         background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; height: 36px;
     }
     
-    /* 메모 내용 저장 버튼: 깔끔하고 신뢰감 주는 블루 톤 */
+    /* 저장 버튼 */
     .stButton > button[key^="save_slide_"] {
         background-color: #0284c7 !important; color: white !important; border: none !important;
         height: 42px !important; font-size: 14px !important; border-radius: 8px !important;
@@ -249,7 +254,7 @@ with tab_search:
 
         item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
         
-        # 💡 [디자인 대혁신] 투박한 st.write 기성품 대신, 정갈한 토스 스타일 대시보드 카드 주입
+        # 매물 카드 UI
         st.markdown(f"""
         <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 12px;">
             <div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
