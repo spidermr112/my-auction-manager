@@ -44,9 +44,9 @@ def reset_session():
 # ─────────────────────────────────────────
 
 CATEGORY_MAP = {
-    "주거용":  ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
+    "주거용":   ["아파트", "연립/다세대", "단독/다가구", "전원주택", "오피스텔(주거)"],
     "비주거용": ["상가", "사무실", "공장", "창고", "빌딩/건물", "지식산업센터", "숙박시설"],
-    "토지":   ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"],
+    "토지":    ["대지", "전/답/과수원", "임야", "잡종지", "기타토지"],
 }
 
 COLUMNS_ORDER = ["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
@@ -62,45 +62,13 @@ st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 
-/* 탭 */
 button[data-baseweb="tab"] {
     font-size: 15px !important;
     font-weight: 700 !important;
     padding: 10px 18px !important;
 }
 
-/* ── 네비게이션 버튼 공통 ── */
-div[data-testid="stHorizontalBlock"]:has(
-    button[data-testid="stBaseButton-secondary"][key="btn_nav_prev"]
-) {
-    align-items: center;
-    background: #f0f2f6;
-    border: 1px solid #dde1e9;
-    border-radius: 10px;
-    padding: 4px 6px;
-    gap: 6px;
-}
-
-button[data-testid="stBaseButton-secondary"][key="btn_nav_prev"],
-button[data-testid="stBaseButton-secondary"][key="btn_nav_next"] {
-    height: 44px !important;
-    min-height: 44px !important;
-    border-radius: 8px !important;
-    font-weight: 700 !important;
-    font-size: 16px !important;
-    background: white !important;
-    border: 1px solid #d0d5dd !important;
-    color: #31333f !important;
-    padding: 0 !important;
-}
-button[data-testid="stBaseButton-secondary"][key="btn_nav_prev"]:hover,
-button[data-testid="stBaseButton-secondary"][key="btn_nav_next"]:hover {
-    background: #007AFF !important;
-    color: white !important;
-    border-color: #007AFF !important;
-}
-
-/* ── 메모 저장 버튼 ── */
+/* 메모 저장 버튼 */
 button[data-testid="stBaseButton-secondary"][key^="save_slide_"] {
     height: 44px !important;
     border-radius: 8px !important;
@@ -108,8 +76,6 @@ button[data-testid="stBaseButton-secondary"][key^="save_slide_"] {
     background: white !important;
     border: 1.5px solid #007AFF !important;
     color: #007AFF !important;
-    transition: all 0.18s !important;
-    margin-top: 4px !important;
 }
 button[data-testid="stBaseButton-secondary"][key^="save_slide_"]:hover {
     background: #007AFF !important;
@@ -117,6 +83,22 @@ button[data-testid="stBaseButton-secondary"][key^="save_slide_"]:hover {
 }
 </style>
 """, unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────
+# query_params 로 네비게이션 처리
+# (HTML 버튼 → URL ?nav=prev/next → Streamlit 감지 → 인덱스 변경)
+# ─────────────────────────────────────────
+
+nav_action = st.query_params.get("nav", None)
+if nav_action in ("prev", "next"):
+    if "current_idx" not in st.session_state:
+        st.session_state.current_idx = 0
+    # 실제 인덱스 변경은 total_count를 알아야 해서
+    # 여기선 방향만 저장하고 렌더링 시점에 처리
+    st.session_state.nav_pending = nav_action
+    st.query_params.clear()
+    st.rerun()
 
 
 # ─────────────────────────────────────────
@@ -241,11 +223,11 @@ with tab_search:
         with f1:
             search_q = st.text_input("📍 검색어", placeholder="주소, 고객명…", key="f_search")
         with f2:
-            f_main = st.multiselect("🏗️ 종류",  list(CATEGORY_MAP.keys()),         default=list(CATEGORY_MAP.keys()), key="f_main")
+            f_main   = st.multiselect("🏗️ 종류",  list(CATEGORY_MAP.keys()),          default=list(CATEGORY_MAP.keys()), key="f_main")
         with f3:
-            f_deal = st.multiselect("💰 거래",  ["매매", "전세", "월세"],           default=["매매", "전세", "월세"],  key="f_deal")
+            f_deal   = st.multiselect("💰 거래",  ["매매", "전세", "월세"],            default=["매매", "전세", "월세"],  key="f_deal")
         with f4:
-            f_status = st.multiselect("🚦 상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"],        key="f_status")
+            f_status = st.multiselect("🚦 상태",  ["진행중", "완료", "보류", "삭제"],  default=["진행중", "보류"],        key="f_status")
 
         if st.button("🔄 검색 조건 초기화", use_container_width=True, key="btn_reset"):
             reset_session()
@@ -266,14 +248,20 @@ with tab_search:
         st.warning("검색 조건에 맞는 매물이 없습니다.")
         st.stop()
 
-    # ── 상세 브리핑 ──
-    st.subheader(f"📋 매물 상세 브리핑 (총 {len(df_filtered)}건)")
-
+    # ── 인덱스 초기화 ──
     if "current_idx" not in st.session_state:
         st.session_state.current_idx = 0
 
     indices     = df_filtered.index.tolist()
     total_count = len(indices)
+
+    # nav_pending: query_params에서 넘어온 방향 처리
+    if "nav_pending" in st.session_state:
+        direction = st.session_state.pop("nav_pending")
+        if direction == "prev":
+            st.session_state.current_idx = (st.session_state.current_idx - 1) % total_count
+        else:
+            st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
 
     if st.session_state.current_idx >= total_count:
         st.session_state.current_idx = 0
@@ -281,9 +269,11 @@ with tab_search:
     cur  = st.session_state.current_idx
     item = df_filtered.loc[indices[cur]]
 
+    # ── 상세 브리핑 ──
+    st.subheader(f"📋 매물 상세 브리핑 (총 {total_count}건)")
+
     with st.container(border=True):
 
-        # 매물 기본 정보
         st.info(f"📍 **{item['소재지']}**")
 
         col_l, col_r = st.columns(2)
@@ -297,7 +287,6 @@ with tab_search:
 
         st.divider()
 
-        # 메모 편집
         st.markdown("**📜 상세 메모**")
         new_memo = st.text_area(
             "내용 수정",
@@ -307,29 +296,75 @@ with tab_search:
             label_visibility="collapsed",
         )
 
-        # ── 네비게이션: 이전 | 1 / 12 | 다음 ──
-        # 카운터를 가운데 열에 HTML로 표시, 버튼은 양쪽 열 Streamlit 버튼 사용
-        nav_prev, nav_mid, nav_next = st.columns([2, 2, 2])
+        # ── 네비게이션 바 ──────────────────────────────────────
+        # st.columns 대신 st.components.v1.html() 사용
+        # → 모바일/PC 모두 항상 한 줄 flexbox 유지
+        # → 버튼 클릭 시 ?nav=prev/next 파라미터로 Streamlit에 신호
+        # ────────────────────────────────────────────────────────
+        import streamlit.components.v1 as components
 
-        with nav_prev:
-            if st.button("◀  이전", key="btn_nav_prev", use_container_width=True):
-                st.session_state.current_idx = (cur - 1) % total_count
-                st.rerun()
-
-        with nav_mid:
-            st.markdown(
-                f"<div style='"
-                f"height:44px; display:flex; align-items:center; justify-content:center;"
-                f"font-size:16px; font-weight:700; color:#31333f;'>"
-                f"{cur + 1} <span style='font-weight:400; color:#999; margin:0 3px'>/</span> {total_count}"
-                f"</div>",
-                unsafe_allow_html=True,
-            )
-
-        with nav_next:
-            if st.button("다음  ▶", key="btn_nav_next", use_container_width=True):
-                st.session_state.current_idx = (cur + 1) % total_count
-                st.rerun()
+        components.html(
+            f"""
+            <style>
+              * {{ margin:0; padding:0; box-sizing:border-box; font-family: sans-serif; }}
+              .nav-wrap {{
+                display: flex;
+                align-items: center;
+                gap: 6px;
+                background: #f0f2f6;
+                border: 1px solid #dde1e9;
+                border-radius: 10px;
+                padding: 4px 6px;
+                height: 52px;
+              }}
+              .nav-btn {{
+                flex: 0 0 80px;
+                height: 44px;
+                background: white;
+                border: 1px solid #d0d5dd;
+                border-radius: 8px;
+                font-size: 16px;
+                font-weight: 700;
+                color: #31333f;
+                cursor: pointer;
+                -webkit-tap-highlight-color: transparent;
+                touch-action: manipulation;
+              }}
+              .nav-btn:active {{
+                background: #007AFF;
+                color: white;
+                border-color: #007AFF;
+              }}
+              .nav-count {{
+                flex: 1;
+                text-align: center;
+                font-size: 17px;
+                font-weight: 700;
+                color: #31333f;
+              }}
+              .nav-count span {{
+                font-size: 13px;
+                font-weight: 400;
+                color: #999;
+                margin: 0 3px;
+              }}
+            </style>
+            <div class="nav-wrap">
+              <button class="nav-btn" onclick="navigate('prev')">◀ 이전</button>
+              <div class="nav-count">{cur + 1}<span>/</span>{total_count}</div>
+              <button class="nav-btn" onclick="navigate('next')">다음 ▶</button>
+            </div>
+            <script>
+              function navigate(dir) {{
+                // 부모 Streamlit 페이지의 URL에 ?nav=prev/next 를 추가해 리로드
+                const url = new URL(window.parent.location.href);
+                url.searchParams.set('nav', dir);
+                window.parent.location.href = url.toString();
+              }}
+            </script>
+            """,
+            height=60,
+        )
 
         # 메모 저장
         if st.button("💾 메모 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
