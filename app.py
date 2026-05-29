@@ -17,21 +17,29 @@ def format_phone_number(input_str):
         return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
     return input_str
 
-# 1. 페이지 설정 및 모바일 최적화 CSS
+# 1. 페이지 설정 및 모바일 최적화/모던 CSS 주입
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    .stApp { background-color: #fcfcfc; }
+    /* 폰트 및 앱 전체 배경 정돈 */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    .stApp { background-color: #f8fafc; font-family: 'Inter', sans-serif; }
     
-    /* 탭 메뉴 디자인 */
+    /* 탭 메뉴: 요즘 트렌디한 플랫  Chiclet 스타일 */
     button[data-baseweb="tab"] {
-        font-size: 15px !important;
-        font-weight: bold !important;
-        padding: 10px 15px !important;
+        font-size: 14px !important;
+        font-weight: 600 !important;
+        padding: 10px 16px !important;
+        border-radius: 8px !important;
+        color: #64748b !important;
+    }
+    button[data-baseweb="tab"][aria-selected="true"] {
+        background-color: #e0f2fe !important;
+        color: #0284c7 !important;
     }
     
-    /* 💡 [50px - 100px - 50px] 전체 조작 바를 정확히 총 가로 200px로 묶고 정중앙 정렬 */
+    /* 💡 [대표님 기획 반영] 50px - 100px - 50px 초정밀 가로 200px 중앙 정렬 락인 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker),
     div[data-testid="stColumns"]:has(.nav-marker) {
         display: flex !important;
@@ -42,70 +50,51 @@ st.markdown("""
         gap: 6px !important;
         width: 200px !important;
         max-width: 100% !important;
-        margin: 20px auto !important;
+        margin: 24px auto 10px auto !important;
     }
     
-    /* 💡 1번째 칸 (이전 버튼): 정확히 50px 박제 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(1),
     div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(1) {
-        width: 50px !important;
-        min-width: 50px !important;
-        max-width: 50px !important;
-        flex: 0 0 50px !important;
+        width: 50px !important; min-width: 50px !important; max-width: 50px !important; flex: 0 0 50px !important;
     }
-    
-    /* 💡 2번째 칸 (카운터 숫자가 뜨는 곳): 정확히 100px 박제 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(2),
     div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(2) {
-        width: 100px !important;
-        min-width: 100px !important;
-        max-width: 100px !important;
-        flex: 0 0 100px !important;
+        width: 100px !important; min-width: 100px !important; max-width: 100px !important; flex: 0 0 100px !important;
     }
-    
-    /* 💡 3번째 칸 (다음 버튼): 정확히 50px 박제 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div:nth-child(3),
     div[data-testid="stColumns"]:has(.nav-marker) > div:nth-child(3) {
-        width: 50px !important;
-        min-width: 50px !important;
-        max-width: 50px !important;
-        flex: 0 0 50px !important;
+        width: 50px !important; min-width: 50px !important; max-width: 50px !important; flex: 0 0 50px !important;
     }
 
-    /* 내비게이션 내부 화살표 버튼 터치 스타일 */
+    /* 슬림 내비게이션 화살표 버튼 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) button,
     div[data-testid="stColumns"]:has(.nav-marker) button {
-        width: 100% !important;
-        height: 38px !important;
-        font-size: 15px !important;
-        font-weight: bold !important;
-        padding: 0 !important;
-        background-color: white !important;
-        border: 1px solid #cbd5e1 !important;
-        color: #334155 !important;
-        border-radius: 8px !important;
-        white-space: nowrap !important;
+        width: 100% !important; height: 36px !important; font-size: 14px !important; font-weight: bold !important;
+        padding: 0 !important; background-color: #ffffff !important; border: 1px solid #cbd5e1 !important;
+        color: #334155 !important; border-radius: 8px !important; white-space: nowrap !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
     }
-    
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover,
     div[data-testid="stColumns"]:has(.nav-marker) button:hover {
-        border-color: #007AFF !important;
-        color: #007AFF !important;
+        border-color: #0284c7 !important; color: #0284c7 !important; background-color: #f0f9ff !important;
     }
 
+    /* 숫자 카운터 박스 스타일 */
     .nav-counter {
-        font-family: 'Inter', sans-serif;
-        font-weight: 700;
-        color: #303133;
-        font-size: 13px;
-        line-height: 36px;
-        text-align: center;
-        background-color: #f1f5f9;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        height: 38px;
+        font-weight: 700; color: #334155; font-size: 13px; line-height: 34px; text-align: center;
+        background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; height: 36px;
     }
     
+    /* 메모 내용 저장 버튼: 깔끔하고 신뢰감 주는 블루 톤 */
+    .stButton > button[key^="save_slide_"] {
+        background-color: #0284c7 !important; color: white !important; border: none !important;
+        height: 42px !important; font-size: 14px !important; border-radius: 8px !important;
+        font-weight: 600 !important; margin-top: 10px !important;
+    }
+    .stButton > button[key^="save_slide_"]:hover {
+        background-color: #0369a1 !important; box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2) !important;
+    }
+
     .nav-marker { display: none; }
     </style>
 """, unsafe_allow_html=True)
@@ -260,22 +249,28 @@ with tab_search:
 
         item = df_filtered.loc[filtered_indices[st.session_state.current_idx]]
         
+        # 💡 [디자인 대혁신] 투박한 st.write 기성품 대신, 정갈한 토스 스타일 대시보드 카드 주입
+        st.markdown(f"""
+        <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.02); margin-bottom: 12px;">
+            <div style="font-size: 16px; font-weight: 700; color: #1e293b; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                <span style="background-color: #f0f9ff; color: #0284c7; padding: 3px 8px; border-radius: 6px; font-size: 12px; font-weight: bold;">{item['상태']}</span>
+                📍 {item['소재지']}
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; font-size: 14px; color: #475569; border-top: 1px solid #f1f5f9; padding-top: 14px;">
+                <div>🏠 <b>물건종류:</b> {item['소분류']}</div>
+                <div>📏 <b>공급면적:</b> {item['면적']}</div>
+                <div>💰 <b>거래가액:</b> <span style="color: #ef4444; font-weight: 700;">{item['가액']}</span> / {item['월세']} 만원</div>
+                <div>👤 <b>고객정보:</b> {item['고객명']} ({item['연락처']})</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        # 메모 및 조작 영역 컨트롤러
         with st.container(border=True):
-            st.info(f"📍 **{item['소재지']}**")
-            sc1, sc2 = st.columns(2)
-            with sc1:
-                st.write(f"🏠 **종류:** {item['소분류']} ({item['상태']})")
-                st.write(f"💰 **가액:** {item['가액']} / {item['월세']}")
-            with sc2:
-                st.write(f"📏 **면적:** {item['면적']}")
-                st.write(f"👤 **고객:** {item['고객명']}")
+            st.markdown("<p style='font-size:14px; font-weight:600; color:#475569; margin-bottom:8px;'>📜 상세 메모 및 특약사항</p>", unsafe_allow_html=True)
+            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=180, key=f"memo_slide_{item.name}", label_visibility="collapsed")
             
-            st.write(f"📞 **연락처:** {item['연락처']}")
-            st.markdown("**📜 상세 메모**")
-            
-            new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
-            
-            # 💡 [50px - 100px - 50px 컴팩트 분할 레이아웃 완료]
+            # 💡 [50px - 100px - 50px 초정밀 고정형 레이아웃] 
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
             with nav_col1:
                 st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
@@ -289,7 +284,7 @@ with tab_search:
                     st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
                     st.rerun()
 
-            if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
+            if st.button("💾 이 매물의 수정된 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
                 df_list.at[item.name, '특약사항'] = new_memo
                 conn.update(data=df_list)
                 st.toast("저장 완료!")
