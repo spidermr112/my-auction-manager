@@ -26,9 +26,9 @@ st.markdown("""
     
     /* 탭 메뉴 디자인 세련되게 변경 */
     button[data-baseweb="tab"] {
-        font-size: 15px !important; /* 모바일을 위해 폰트 크기 살짝 조정 */
+        font-size: 15px !important;
         font-weight: bold !important;
-        padding: 10px 15px !important; /* 여백을 줄여 폰 화면 공간 확보 */
+        padding: 10px 15px !important;
     }
     
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
@@ -62,7 +62,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📄 페이지부동산")
+st.title("📄 페이지부동산 매물 관리 시스템")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
@@ -100,7 +100,7 @@ def process_area(input_str):
     return p, f"{p}평"
 
 
-# 🔄 폰 화면에 딱 맞춘 4글자 탭 구성 (선언 순서 매칭 완료)
+# 🔄 3단 탭 구성
 tab_register, tab_list, tab_search = st.tabs([
     "➕ 신규등록", 
     "📋 전체목록", 
@@ -178,12 +178,8 @@ with tab_list:
 # 3번째 탭: 🔍 목록검색
 # ==========================================
 with tab_search:
-    col_top1, col_top2 = st.columns([8, 2])
-    
-    with col_top2:
-        if st.button("🔄 검색 초기화", use_container_width=True, key="btn_reset_tab1"):
-            reset_all()
-    
+    # 💡 상단에 불필요하게 붕 떠있던 검색 초기화 버튼을 제거하여 레이아웃을 깔끔하게 정리했습니다.
+
     # 통합 필터 바
     st.subheader("🔍 통합 검색 필터")
     filter_row = st.container(border=True)
@@ -193,6 +189,12 @@ with tab_search:
         with c2: f_main_cat = st.multiselect("🏗️ 종류", options=list(category_map.keys()), default=list(category_map.keys()), key="f_main")
         with c3: f_deal_type = st.multiselect("💰 거래", options=["매매", "전세", "월세"], default=["매매", "전세", "월세"], key="f_deal")
         with c4: status_list = st.multiselect("🚦 상태", options=["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
+        
+        # 💡 [구조 개선] 사용자의 시선 흐름에 맞춰 필터 박스 맨 우측 하단에 자연스럽게 배치
+        st.markdown("<div style='text-align: right; margin-top: 10px;'>", unsafe_allow_html=True)
+        if st.button("🔄 검색 조건 초기화", use_container_width=True, key="btn_reset_tab1"):
+            reset_all()
+        st.markdown("</div>", unsafe_allow_html=True)
 
     df_filtered = df_list.copy()
     if not df_filtered.empty:
