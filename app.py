@@ -62,7 +62,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-st.title("📄 페이지부동산 매물 관리 시스템")
+st.title("📄 페이지부동산")
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
