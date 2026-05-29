@@ -4,6 +4,26 @@ import pandas as pd
 from datetime import datetime
 import re
 
+# 💡 연락처 하이픈 자동 변환 함수 추가
+def format_phone_number(input_str):
+    if not input_str:
+        return ""
+    # 숫자만 추출
+    nums = "".join(filter(str.isdigit, input_str))
+    
+    # 8자리인 경우 (예: 12345678) -> 앞에 010 붙이기
+    if len(nums) == 8:
+        nums = "010" + nums
+        
+    # 11자리 완성형인 경우 하이픈 포맷팅
+    if len(nums) == 11:
+        return f"{nums[:3]}-{nums[3:7]}-{nums[7:]}"
+    # 10자리인 경우 예외 처리
+    elif len(nums) == 10:
+        return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
+        
+    return input_str
+
 # 1. 페이지 설정 및 [디자인 완성형] CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
@@ -146,10 +166,22 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
     if st.button("🏠 구글 시트에 저장", use_container_width=True):
         _, py_display = process_area(area_text)
+        
+        # 💡 [수정 반영] 저장 직전에 웹 입력창의 연락처를 자동 변환
+        formatted_phone = format_phone_number(client_phone)
+        
         new_entry = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"), "고객명": client_name, "연락처": client_phone, 
-            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
-            "가액": price, "월세": rent, "상태": "진행중", "소재지": addr, "특약사항": memo
+            "접수일": reg_date.strftime("%Y-%m-%d"), 
+            "고객명": client_name, 
+            "연락처": formatted_phone, # 💡 변환된 번호 매칭
+            "대분류": main_cat, 
+            "소분류": sub_cat, 
+            "면적": py_display, 
+            "가액": price, 
+            "월세": rent, 
+            "상태": "진행중", 
+            "소재지": addr, 
+            "특약사항": memo
         }])
         updated_df = pd.concat([new_entry, df_list], ignore_index=True)
         conn.update(data=updated_df)
@@ -186,6 +218,7 @@ edited_df = st.data_editor(
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
         "특약사항": None  # 특약사항(메모)은 표에서 제외
     },
+    # 💡 [수정 반영] 요청하신 셀 순서대로 목록 재정렬
     column_order=[
         "상태", 
         "소분류", 
