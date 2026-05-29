@@ -24,34 +24,40 @@ st.markdown("""
     <style>
     .stApp { background-color: #fcfcfc; }
     
-    /* 탭 메뉴 디자인 세련되게 변경 */
+    /* 탭 메뉴 디자인 */
     button[data-baseweb="tab"] {
         font-size: 15px !important;
         font-weight: bold !important;
         padding: 10px 15px !important;
     }
     
-    /* 💡 [치트키] 모바일 기기에서도 무조건 세로 적층을 막고 한 줄로 강제 고정 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
+    /* 💡 [치트키] 모바일 구형/신형 엔진을 모두 저격하여 무조건 1열 가로 배열 고정 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker),
+    div[data-testid="stColumns"]:has(.nav-marker) {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
-        justify-content: center !important;
+        justify-content: space-between !important;
         align-items: center !important;
-        gap: 8px !important;
+        gap: 6px !important;
         width: 100% !important;
     }
     
-    /* 하위 컬럼 자식 노드들의 모바일 반응형 100% 너비 강제 해제 */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div {
-        width: auto !important;
-        flex: 1 1 0% !important;
-        min-width: 0 !important;
+    /* 💡 스트림릿이 모바일에서 컬럼을 100%로 늘려 아래로 떨어뜨리는 버그를 강제로 차단 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div,
+    div[data-testid="stColumns"]:has(.nav-marker) > div,
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) [data-testid="stColumn"],
+    div[data-testid="stColumns"]:has(.nav-marker) [data-testid="stColumn"] {
+        width: 33.33% !important;
+        min-width: 33.33% !important;
+        max-width: 33.33% !important;
+        flex: 1 1 33.33% !important;
         padding: 0 !important;
     }
 
-    /* 내비게이션 내부 버튼 전체 디자인 제어 (존재하지 않는 key 매칭 제거) */
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button {
+    /* 내비게이션 내부 버튼 터치 영역 및 글자 안 잘리게 세팅 */
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button,
+    div[data-testid="stColumns"]:has(.nav-marker) button {
         width: 100% !important;
         height: 38px !important;
         font-size: 14px !important;
@@ -61,9 +67,11 @@ st.markdown("""
         border: 1px solid #cbd5e1 !important;
         color: #334155 !important;
         border-radius: 8px !important;
+        white-space: nowrap !important;
     }
     
-    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover {
+    div[data-testid="stHorizontalBlock"]:has(.nav-marker) button:hover,
+    div[data-testid="stColumns"]:has(.nav-marker) button:hover {
         border-color: #007AFF !important;
         color: #007AFF !important;
     }
@@ -250,7 +258,7 @@ with tab_search:
             
             new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
             
-            # 💡 [핵심 교정 공간] .nav-marker 클래스로 이 감싸진 수평 블록을 정확하게 명중시킵니다.
+            # 💡 [모바일 3강 분할 완벽 락인] 컬럼의 너비를 강제로 33%씩 나눠 할당합니다.
             nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
             with nav_col1:
                 st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
