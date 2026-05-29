@@ -4,35 +4,25 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# 💡 연락처 하이픈 자동 변환 함수 추가
+# 💡 연락처 하이픈 자동 변환 함수
 def format_phone_number(input_str):
     if not input_str:
         return ""
-    # 숫자만 추출
     nums = "".join(filter(str.isdigit, input_str))
-    
-    # 8자리인 경우 (예: 12345678) -> 앞에 010 붙이기
     if len(nums) == 8:
         nums = "010" + nums
-        
-    # 11자리 완성형인 경우 하이픈 포맷팅
     if len(nums) == 11:
         return f"{nums[:3]}-{nums[3:7]}-{nums[7:]}"
-    # 10자리인 경우 예외 처리
     elif len(nums) == 10:
         return f"{nums[:3]}-{nums[3:6]}-{nums[6:]}"
-        
     return input_str
 
-# 1. 페이지 설정 및 [디자인 완성형] CSS
+# 1. 페이지 설정 및 CSS
 st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
     <style>
-    /* 전체 배경 톤 조절 */
     .stApp { background-color: #fcfcfc; }
-    
-    /* 1. 내비게이션 바: 가로/세로 폭 극소화 및 중앙 정렬 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) {
         display: flex !important;
         flex-direction: row !important;
@@ -40,71 +30,31 @@ st.markdown("""
         align-items: center !important;
         gap: 0px !important;
         width: fit-content !important;
-        margin: 10px auto !important; /* 메모장과 저장 버튼 사이 적절한 여백 */
+        margin: 10px auto !important;
         padding: 0 !important;
     }
-    
-    /* 2. 각 요소 사이의 간격 제거 */
     div[data-testid="stHorizontalBlock"]:has(.nav-marker) > div[data-testid="column"] {
-        flex: 0 0 auto !important;
-        width: auto !important;
-        min-width: 0 !important;
-        padding: 0 !important;
+        flex: 0 0 auto !important; width: auto !important; min-width: 0 !important; padding: 0 !important;
     }
-
-    /* 3. 내비게이션 버튼: 세련된 콤팩트 디자인 */
     .stButton > button[key^="btn_nav_"] {
-        border: 1px solid #dcdfe6 !important;
-        background: white !important;
-        color: #606266 !important;
-        font-weight: 700 !important;
-        font-size: 14px !important;
-        height: 36px !important;
-        padding: 0 15px !important;
-        border-radius: 8px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
+        border: 1px solid #dcdfe6 !important; background: white !important; color: #606266 !important;
+        font-weight: 700 !important; font-size: 14px !important; height: 36px !important;
+        padding: 0 15px !important; border-radius: 8px !important; box-shadow: 0 2px 4px rgba(0,0,0,0.05) !important;
         transition: all 0.2s !important;
     }
-    
-    .stButton > button[key^="btn_nav_"]:hover {
-        border-color: #007AFF !important;
-        color: #007AFF !important;
-        background-color: #f0f7ff !important;
-    }
-
-    /* 4. 중앙 숫자 카운터 */
-    .nav-counter {
-        font-family: 'Inter', sans-serif;
-        font-weight: 700;
-        color: #303133;
-        font-size: 15px;
-        line-height: 36px;
-        padding: 0 15px;
-        text-align: center;
-    }
-    
+    .stButton > button[key^="btn_nav_"]:hover { border-color: #007AFF !important; color: #007AFF !important; background-color: #f0f7ff !important; }
+    .nav-counter { font-family: 'Inter', sans-serif; font-weight: 700; color: #303133; font-size: 15px; line-height: 36px; padding: 0 15px; text-align: center; }
     .nav-marker { display: none; }
-    
-    /* 5. 하단 메모 저장 버튼 */
     .stButton > button[key^="save_slide_"] {
-        margin-top: 5px !important;
-        height: 42px !important;
-        border-radius: 8px !important;
-        font-weight: 600 !important;
-        background-color: #ffffff !important;
-        border: 1px solid #007AFF !important;
-        color: #007AFF !important;
+        margin-top: 5px !important; height: 42px !important; border-radius: 8px !important;
+        font-weight: 600 !important; background-color: #ffffff !important; border: 1px solid #007AFF !important; color: #007AFF !important;
     }
-    .stButton > button[key^="save_slide_"]:hover {
-        background-color: #007AFF !important;
-        color: #ffffff !important;
-    }
+    .stButton > button[key^="save_slide_"]:hover { background-color: #007AFF !important; color: #ffffff !important; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("📄 페이지부동산 매물 관리 시스템")
 
-# --- [데이터 연결] ---
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 def load_data():
@@ -121,7 +71,6 @@ def load_data():
 
 df_list = load_data()
 
-# --- 초기화 기능 ---
 def reset_all():
     for key in list(st.session_state.keys()):
         del st.session_state[key]
@@ -151,7 +100,15 @@ with st.expander("➕ 새 매물 등록", expanded=False):
     with col1:
         reg_date = st.date_input("접수일", datetime.today(), key="reg_date")
         client_name = st.text_input("고객명", key="reg_name")
-        client_phone = st.text_input("연락처", key="reg_phone")
+        
+        # 💡 힌트 안내문(placeholder) 추가
+        client_phone = st.text_input("연락처", placeholder="010-    -    (숫자만 입력 가능)", key="reg_phone")
+        
+        # 💡 숫자가 입력되면 실시간으로 어떻게 저장될지 예측 포맷 보여주기
+        if client_phone:
+            preview_phone = format_phone_number(client_phone)
+            st.caption(f"ℹ️ 저장 예정: `{preview_phone}`")
+            
         main_cat = st.radio("물건 대분류", list(category_map.keys()), horizontal=True, key="reg_main")
     with col2:
         sub_cat = st.selectbox("물건 소분류", options=category_map[main_cat], key="reg_sub")
@@ -166,22 +123,12 @@ with st.expander("➕ 새 매물 등록", expanded=False):
 
     if st.button("🏠 구글 시트에 저장", use_container_width=True):
         _, py_display = process_area(area_text)
-        
-        # 💡 [수정 반영] 저장 직전에 웹 입력창의 연락처를 자동 변환
         formatted_phone = format_phone_number(client_phone)
         
         new_entry = pd.DataFrame([{
-            "접수일": reg_date.strftime("%Y-%m-%d"), 
-            "고객명": client_name, 
-            "연락처": formatted_phone, # 💡 변환된 번호 매칭
-            "대분류": main_cat, 
-            "소분류": sub_cat, 
-            "면적": py_display, 
-            "가액": price, 
-            "월세": rent, 
-            "상태": "진행중", 
-            "소재지": addr, 
-            "특약사항": memo
+            "접수일": reg_date.strftime("%Y-%m-%d"), "고객명": client_name, "연락처": formatted_phone, 
+            "대분류": main_cat, "소분류": sub_cat, "면적": py_display, 
+            "가액": price, "월세": rent, "상태": "진행중", "소재지": addr, "특약사항": memo
         }])
         updated_df = pd.concat([new_entry, df_list], ignore_index=True)
         conn.update(data=updated_df)
@@ -216,22 +163,12 @@ edited_df = st.data_editor(
     hide_index=False,
     column_config={
         "상태": st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-        "특약사항": None  # 특약사항(메모)은 표에서 제외
+        "특약사항": None
     },
-    # 💡 [수정 반영] 요청하신 셀 순서대로 목록 재정렬
-    column_order=[
-        "상태", 
-        "소분류", 
-        "소재지", 
-        "면적", 
-        "가액", 
-        "월세", 
-        "고객명", 
-        "연락처"
-    ]
+    column_order=["상태", "소분류", "소재지", "면적", "가액", "월세", "고객명", "연락처"]
 )
 
-# --- 5. [상세 브리핑 영역] 순서 최적화 ---
+# 5. 상세 브리핑 영역
 if not df_filtered.empty:
     st.markdown("---")
     st.subheader("📋 매물 상세 브리핑")
@@ -260,10 +197,8 @@ if not df_filtered.empty:
         st.write(f"📞 **연락처:** {item['연락처']}")
         st.markdown("**📜 상세 메모**")
         
-        # 5-1. 메모장
         new_memo = st.text_area("내용 수정", value=item['특약사항'], height=200, key=f"memo_slide_{item.name}", label_visibility="collapsed")
         
-        # 5-2. [디자인 완성형] 내비게이션 버튼 (메모 저장 바로 위)
         nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
         with nav_col1:
             st.markdown('<div class="nav-marker"></div>', unsafe_allow_html=True)
@@ -277,7 +212,6 @@ if not df_filtered.empty:
                 st.session_state.current_idx = (st.session_state.current_idx + 1) % total_count
                 st.rerun()
 
-        # 5-3. 메모 저장 버튼 (최하단)
         if st.button("💾 메모 내용 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
             df_list.at[item.name, '특약사항'] = new_memo
             conn.update(data=df_list)
