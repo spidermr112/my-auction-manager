@@ -43,10 +43,10 @@ COLUMNS_ORDER = ["상태", "소분류", "소재지", "면적", "가액", "월세
 
 
 # ─────────────────────────────────────────
-# 페이지 설정 & 글로벌 CSS (브라우저 타이틀 수정)
+# 페이지 설정 & 글로벌 CSS
 # ─────────────────────────────────────────
 
-st.set_page_config(page_title="매물관리", page_icon="📄", layout="wide")
+st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
 
 st.markdown("""
 <style>
@@ -166,21 +166,23 @@ df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 상단 타이틀 및 탭 구성 (타이틀 축소)
+# 상단 탭 구성
 # ─────────────────────────────────────────
 
-st.title("📄 매물 관리")
+st.title("📄 페이지부동산 매물 관리 시스템")
 tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 진행목록", "✅ 완료목록"])
 
 
 # ═══════════════════════════════════════════
-# TAB 1 — 신규등록 (화면 차지 요소 제거)
+# TAB 1 — 신규등록
 # ═══════════════════════════════════════════
 
 with tab_register:
+    st.subheader("➕ 신규 매물 등록")
     with st.container(border=True):
         
-        # [상단 영역] 선택 항목
+        # [상단 영역] 마우스/터치 중심 항목 (키보드 미작동 영역)
+        st.markdown("##### 🖱️ 1. 선택 항목 (터치로 선택)")
         col_top1, col_top2 = st.columns([1, 1])
         
         with col_top1:
@@ -191,11 +193,15 @@ with tab_register:
             deal_type = st.radio("거래 구분", ["매매", "전세", "월세"], horizontal=True, key="reg_deal")
             sub_cat   = st.selectbox("물건 소분류", CATEGORY_MAP[main_cat], key="reg_sub")
             
-        # [하단 영역] 입력 항목
+        st.markdown("<hr style='margin: 15px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
+        
+        # [하단 영역] 키보드 입력 필수 항목 (가상 키보드가 올라오는 영역)
+        st.markdown("##### ⌨️ 2. 입력 항목 (키보드 타이핑)")
         col_bot1, col_bot2 = st.columns([1, 1])
         
         with col_bot1:
             client_name = st.text_input("고객명", key="reg_name")
+            # 실시간 포맷 캡션 제거 및 라벨명 수정
             raw_phone   = st.text_input("연락처 (숫자만 입력)", placeholder="예: 01012345678", key="reg_phone")
             addr        = st.text_input("소재지 상세", key="reg_addr")
             
