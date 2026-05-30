@@ -46,13 +46,20 @@ COLUMNS_ORDER = ["상태", "소분류", "소재지", "면적", "가액", "월세
 # 페이지 설정 & 글로벌 CSS
 # ─────────────────────────────────────────
 
-st.set_page_config(page_title="페이지부동산", page_icon="📄", layout="wide")
+# 브라우저 탭 이름만 '매물관리'로 표시하고 화면 내부 제목은 삭제함
+st.set_page_config(page_title="매물관리", page_icon="📄", layout="wide")
 
 st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 
-/* 탭 */
+/* 상단 여백 줄이기 */
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 0rem !important;
+}
+
+/* 탭 폰트 설정 */
 button[data-baseweb="tab"] {
     font-size: 15px !important;
     font-weight: 700 !important;
@@ -166,10 +173,9 @@ df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 상단 탭 구성
+# 상단 탭 구성 (st.title 삭제함)
 # ─────────────────────────────────────────
 
-st.title("📄 페이지부동산 매물 관리 시스템")
 tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 진행목록", "✅ 완료목록"])
 
 
@@ -181,8 +187,7 @@ with tab_register:
     st.subheader("➕ 신규 매물 등록")
     with st.container(border=True):
         
-        # [상단 영역] 마우스/터치 중심 항목 (키보드 미작동 영역)
-        st.markdown("##### 🖱️ 1. 선택 항목 (터치로 선택)")
+        # [상단 영역] 선택 항목
         col_top1, col_top2 = st.columns([1, 1])
         
         with col_top1:
@@ -195,13 +200,11 @@ with tab_register:
             
         st.markdown("<hr style='margin: 15px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
         
-        # [하단 영역] 키보드 입력 필수 항목 (가상 키보드가 올라오는 영역)
-        st.markdown("##### ⌨️ 2. 입력 항목 (키보드 타이핑)")
+        # [하단 영역] 입력 항목
         col_bot1, col_bot2 = st.columns([1, 1])
         
         with col_bot1:
             client_name = st.text_input("고객명", key="reg_name")
-            # 실시간 포맷 캡션 제거 및 라벨명 수정
             raw_phone   = st.text_input("연락처 (숫자만 입력)", placeholder="예: 01012345678", key="reg_phone")
             addr        = st.text_input("소재지 상세", key="reg_addr")
             
