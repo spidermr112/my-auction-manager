@@ -143,7 +143,7 @@ button[data-testid="stBaseButton-secondary"][key^="save_slide_"]:hover {
 
 
 # ─────────────────────────────────────────
-# 구글 시트 연결 & 데이터 로드
+# 구글 시트 연결 & 데이터 로드 (탭 이름 변경 반영)
 # ─────────────────────────────────────────
 
 conn = st.connection("gsheets", type=GSheetsConnection)
@@ -160,8 +160,8 @@ def load_tab_data(worksheet_name: str) -> pd.DataFrame:
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류",
                                      "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
-# 두 개의 시트 데이터를 각각 명확하게 호출
-df_active = load_tab_data("진행중매물")
+# 변경된 구글 시트 탭 이름으로 매칭
+df_active = load_tab_data("진행목록")
 df_completed = load_tab_data("완료목록")
 
 # 검색 및 전수 관리를 위한 통합 데이터셋 구축
@@ -169,11 +169,11 @@ df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 신규 4대 탭 구성 및 순서 변경
+# 신규 4대 탭 구성 및 이름 수정 (진행목록 / 완료목록)
 # ─────────────────────────────────────────
 
 st.title("📄 페이지부동산 매물 관리 시스템")
-tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 전체목록", "✅ 완료목록"])
+tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 진행목록", "✅ 완료목록"])
 
 
 # ═══════════════════════════════════════════
@@ -220,9 +220,9 @@ with tab_register:
                     "상태":   "진행중",                       "소재지": addr,
                     "특약사항": memo,
                 }])
-                # 신규 저장은 무조건 '진행중매물' 탭 최상단에 추가됨
+                # 신규 저장은 '진행목록' 탭 최상단에 추가됨
                 updated_active = pd.concat([new_row, df_active], ignore_index=True)
-                conn.update(worksheet="진행중매물", data=updated_active)
+                conn.update(worksheet="진행목록", data=updated_active)
                 st.success("새로운 매물이 저장되었습니다!")
                 st.rerun()
 
@@ -320,8 +320,8 @@ with tab_search:
                     final_completed = df_all[df_all["상태"] == "완료"]
                     final_active = df_all[df_all["상태"] != "완료"]
                     
-                    # 구글 워크시트에 각각 전송
-                    conn.update(worksheet="진행중매물", data=final_active)
+                    # 업데이트된 구글 워크시트명("진행목록", "완료목록")으로 각각 전송
+                    conn.update(worksheet="진행목록", data=final_active)
                     conn.update(worksheet="완료목록", data=final_completed)
                     
                     st.toast(f"매물 상태가 '{updated_status}'(으)로 동기화 및 타겟 시트 정렬 완료!")
@@ -331,7 +331,7 @@ with tab_search:
 
 
 # ═══════════════════════════════════════════
-# TAB 3 — 전체목록 (진행중 / 보류 / 삭제 편집용)
+# TAB 3 — 진행목록 (진행중 / 보류 / 삭제 편집용)
 # ═══════════════════════════════════════════
 
 with tab_list:
@@ -360,10 +360,10 @@ with tab_list:
             df_completed = pd.concat([moved_to_comp, df_completed], ignore_index=True)
             conn.update(worksheet="완료목록", data=df_completed)
             
-        # 진행중매물 갱신
-        conn.update(worksheet="진행중매물", data=remain_active)
+        # 진행목록 갱신
+        conn.update(worksheet="진행목록", data=remain_active)
         
-        st.toast("전체목록 변경사항이 완벽하게 시트에 동기화되었습니다!")
+        st.toast("진행목록 변경사항이 완벽하게 시트에 동기화되었습니다!")
         st.rerun()
 
 
@@ -392,10 +392,10 @@ with tab_archive:
         rollback_to_active = edited_comp_df[edited_comp_df["상태"] != "완료"]
         stay_completed = edited_comp_df[edited_comp_df["상태"] == "완료"]
         
-        # 원복할 데이터가 있다면 진행중 시트 상단에 병합
+        # 원복할 데이터가 있다면 진행목록 시트 상단에 병합
         if not rollback_to_active.empty:
             df_active = pd.concat([rollback_to_active, df_active], ignore_index=True)
-            conn.update(worksheet="진행중매물", data=df_active)
+            conn.update(worksheet="진행목록", data=df_active)
             
         # 완료목록 최종 갱신
         conn.update(worksheet="완료목록", data=stay_completed)
