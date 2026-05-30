@@ -43,23 +43,16 @@ COLUMNS_ORDER = ["상태", "소분류", "소재지", "면적", "가액", "월세
 
 
 # ─────────────────────────────────────────
-# 페이지 설정 & 글로벌 CSS
+# 페이지 설정 & 글로벌 CSS (브라우저 타이틀 수정)
 # ─────────────────────────────────────────
 
-# 브라우저 탭 이름만 '매물관리'로 표시하고 화면 내부 제목은 삭제함
 st.set_page_config(page_title="매물관리", page_icon="📄", layout="wide")
 
 st.markdown("""
 <style>
 .stApp { background-color: #f8f9fa; }
 
-/* 상단 여백 줄이기 */
-.block-container {
-    padding-top: 1rem !important;
-    padding-bottom: 0rem !important;
-}
-
-/* 탭 폰트 설정 */
+/* 탭 */
 button[data-baseweb="tab"] {
     font-size: 15px !important;
     font-weight: 700 !important;
@@ -173,18 +166,18 @@ df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 상단 탭 구성 (st.title 삭제함)
+# 상단 타이틀 및 탭 구성 (타이틀 축소)
 # ─────────────────────────────────────────
 
+st.title("📄 매물 관리")
 tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 진행목록", "✅ 완료목록"])
 
 
 # ═══════════════════════════════════════════
-# TAB 1 — 신규등록
+# TAB 1 — 신규등록 (화면 차지 요소 제거)
 # ═══════════════════════════════════════════
 
 with tab_register:
-    st.subheader("➕ 신규 매물 등록")
     with st.container(border=True):
         
         # [상단 영역] 선택 항목
@@ -198,8 +191,6 @@ with tab_register:
             deal_type = st.radio("거래 구분", ["매매", "전세", "월세"], horizontal=True, key="reg_deal")
             sub_cat   = st.selectbox("물건 소분류", CATEGORY_MAP[main_cat], key="reg_sub")
             
-        st.markdown("<hr style='margin: 15px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
-        
         # [하단 영역] 입력 항목
         col_bot1, col_bot2 = st.columns([1, 1])
         
