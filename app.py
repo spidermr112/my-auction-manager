@@ -182,9 +182,12 @@ with tab_register:
         col_top1, col_top2 = st.columns([1, 1])
         with col_top1:
             reg_date = st.date_input("접수일", datetime.today(), key="reg_date")
-            main_cat = st.radio("물건 대분류", list(CATEGORY_MAP.keys()), horizontal=True, key="reg_main")
-        with col_top2:
+            # [수정] 거래 구분 라디오 버튼을 왼쪽(col_top1)으로 이동
             deal_type = st.radio("거래 구분", ["매매", "전세", "월세"], horizontal=True, key="reg_deal")
+            
+        with col_top2:
+            # [수정] 물건 대분류 라디오 버튼을 오른쪽(col_top2)으로 이동
+            main_cat = st.radio("물건 대분류", list(CATEGORY_MAP.keys()), horizontal=True, key="reg_main")
             sub_cat   = st.selectbox("물건 소분류", CATEGORY_MAP[main_cat], key="reg_sub")
 
         st.markdown("<hr style='margin: 15px 0; border-color: #e2e8f0;'>", unsafe_allow_html=True)
