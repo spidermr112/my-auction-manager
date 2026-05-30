@@ -148,9 +148,9 @@ button[data-testid="stBaseButton-secondary"][key^="save_slide_"]:hover {
 
 conn = st.connection("gsheets", type=GSheetsConnection)
 
-def load_data() -> pd.DataFrame:
+def load_tab_data(worksheet_name: str) -> pd.DataFrame:
     try:
-        df = conn.read(ttl=0)
+        df = conn.read(worksheet=worksheet_name, ttl=0)
         df = df.dropna(how="all").fillna("")
         for col in ["가액", "월세"]:
             if col in df.columns:
@@ -160,15 +160,20 @@ def load_data() -> pd.DataFrame:
         return pd.DataFrame(columns=["접수일", "고객명", "연락처", "대분류", "소분류",
                                      "면적", "가액", "월세", "상태", "소재지", "특약사항"])
 
-df_all = load_data()
+# 두 개의 시트 데이터를 각각 명확하게 호출
+df_active = load_tab_data("진행중매물")
+df_completed = load_tab_data("완료목록")
+
+# 검색 및 전수 관리를 위한 통합 데이터셋 구축
+df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 탭 구성
+# 신규 4대 탭 구성 및 순서 변경
 # ─────────────────────────────────────────
 
 st.title("📄 페이지부동산 매물 관리 시스템")
-tab_register, tab_list, tab_search = st.tabs(["➕ 신규등록", "📋 전체목록", "🔍 목록검색"])
+tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 전체목록", "✅ 완료목록"])
 
 
 # ═══════════════════════════════════════════
@@ -215,43 +220,25 @@ with tab_register:
                     "상태":   "진행중",                       "소재지": addr,
                     "특약사항": memo,
                 }])
-                conn.update(data=pd.concat([new_row, df_all], ignore_index=True))
+                # 신규 저장은 무조건 '진행중매물' 탭 최상단에 추가됨
+                updated_active = pd.concat([new_row, df_active], ignore_index=True)
+                conn.update(worksheet="진행중매물", data=updated_active)
                 st.success("새로운 매물이 저장되었습니다!")
                 st.rerun()
 
 
 # ═══════════════════════════════════════════
-# TAB 2 — 전체목록
-# ═══════════════════════════════════════════
-
-with tab_list:
-    st.subheader(f"📋 등록 매물 전체 목록 ({len(df_all)}건)")
-    st.data_editor(
-        df_all,
-        use_container_width=True,
-        hide_index=False,
-        column_config={
-            "상태":     st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
-            "특약사항": None,
-        },
-        column_order=COLUMNS_ORDER,
-    )
-
-
-# ═══════════════════════════════════════════
-# TAB 3 — 목록검색
+# TAB 2 — 목록검색 & 상세 브리핑 (자동 분리/이동 핵심부)
 # ═══════════════════════════════════════════
 
 with tab_search:
-
-    # ── 필터 ──
     st.subheader("🔍 통합 검색 필터")
     with st.container(border=True):
         f1, f2, f3, f4 = st.columns([1.5, 1, 1, 1])
         with f1: search_q = st.text_input("📍 검색어", placeholder="주소, 고객명…", key="f_search")
         with f2: f_main   = st.multiselect("🏗️ 종류", list(CATEGORY_MAP.keys()), default=list(CATEGORY_MAP.keys()), key="f_main")
         with f3: f_deal   = st.multiselect("💰 거래", ["매매", "전세", "월세"],   default=["매매", "전세", "월세"],  key="f_deal")
-        with f4: f_status = st.multiselect("🚦 상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류"], key="f_status")
+        with f4: f_status = st.multiselect("🚦 상태", ["진행중", "완료", "보류", "삭제"], default=["진행중", "보류", "완료"], key="f_status")
         if st.button("🔄 검색 조건 초기화", use_container_width=True, key="btn_reset"):
             reset_session()
 
@@ -269,59 +256,149 @@ with tab_search:
 
     if df_filtered.empty:
         st.warning("검색 조건에 맞는 매물이 없습니다. 필터를 조정해 주세요.")
-        st.stop()
+    else:
+        st.subheader(f"📋 매물 상세 브리핑 (총 {len(df_filtered)}건)")
 
-    # ── 상세 브리핑 ──
-    st.subheader(f"📋 매물 상세 브리핑 (총 {len(df_filtered)}건)")
+        if "current_idx" not in st.session_state: st.session_state.current_idx = 0
+        indices     = df_filtered.index.tolist()
+        total_count = len(indices)
+        if st.session_state.current_idx >= total_count: st.session_state.current_idx = 0
+        cur  = st.session_state.current_idx
+        
+        item = df_filtered.iloc[cur]
 
-    if "current_idx" not in st.session_state: st.session_state.current_idx = 0
-    indices     = df_filtered.index.tolist()
-    total_count = len(indices)
-    if st.session_state.current_idx >= total_count: st.session_state.current_idx = 0
-    cur  = st.session_state.current_idx
-    item = df_filtered.loc[indices[cur]]
-
-    # 매물 요약 카드
-    st.markdown(f"""
-    <div style="background:white; border:1px solid #e2e8f0; border-radius:12px;
-                padding:20px; margin-bottom:12px;">
-        <div style="font-size:16px; font-weight:700; color:#1e293b; margin-bottom:16px;">
-            📍 {item['소재지']}
+        # 매물 요약 카드
+        st.markdown(f"""
+        <div style="background:white; border:1px solid #e2e8f0; border-radius:12px;
+                    padding:20px; margin-bottom:12px;">
+            <div style="font-size:16px; font-weight:700; color:#1e293b; margin-bottom:16px;">
+                📍 {item['소재지']}
+            </div>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
+                        gap:12px; font-size:14px; color:#475569;
+                        border-top:1px solid #f1f5f9; padding-top:14px;">
+                <div>🏠 <b>물건종류:</b> {item['소분류']} (<span style="color:#007AFF;font-weight:bold;">{item['상태']}</span>)</div>
+                <div>📏 <b>공급면적:</b> {item['면적']}</div>
+                <div>💰 <b>거래가액:</b> <span style="color:#ef4444;font-weight:700;">{item['가액']}만</span> / 월세 {item['월세']}만</div>
+                <div>👤 <b>고객/연락처:</b> {item['고객명']} ({item['연락처']})</div>
+            </div>
         </div>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px,1fr));
-                    gap:12px; font-size:14px; color:#475569;
-                    border-top:1px solid #f1f5f9; padding-top:14px;">
-            <div>🏠 <b>물건종류:</b> {item['소분류']} ({item['상태']})</div>
-            <div>📏 <b>공급면적:</b> {item['면적']}</div>
-            <div>💰 <b>거래가액:</b> <span style="color:#ef4444;font-weight:700;">{item['가액']}만</span> / 월세 {item['월세']}만</div>
-            <div>👤 <b>고객/연락처:</b> {item['고객명']} ({item['연락처']})</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # 메모 + 네비게이션
-    with st.container(border=True):
-        st.markdown("**📜 상세 메모**")
-        new_memo = st.text_area("내용 수정", value=item["특약사항"], height=200,
-                                key=f"memo_slide_{item.name}", label_visibility="collapsed")
+        with st.container(border=True):
+            status_list = ["진행중", "완료", "보류", "삭제"]
+            default_status_idx = status_list.index(item["상태"]) if item["상태"] in status_list else 0
+            updated_status = st.selectbox("🚦 이 매물의 현재 상태 변경", status_list, index=default_status_idx, key=f"status_select_{cur}")
+            
+            st.markdown("**📜 상세 메모**")
+            new_memo = st.text_area("내용 수정", value=item["특약사항"], height=200,
+                                    key=f"memo_slide_{cur}", label_visibility="collapsed")
 
-        # 네비게이션: nav-marker CSS 저격으로 모바일 가로 고정
-        nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
-        with nav_col1:
-            st.markdown("<span class='nav-marker'></span>", unsafe_allow_html=True)
-            if st.button("◀", key="btn_nav_prev", use_container_width=True):
-                st.session_state.current_idx = (cur - 1) % total_count
-                st.rerun()
-        with nav_col2:
-            st.markdown(f"<div class='nav-counter'>{cur + 1} / {total_count}</div>",
-                        unsafe_allow_html=True)
-        with nav_col3:
-            if st.button("▶", key="btn_nav_next", use_container_width=True):
-                st.session_state.current_idx = (cur + 1) % total_count
-                st.rerun()
+            # 네비게이션
+            nav_col1, nav_col2, nav_col3 = st.columns([1, 1, 1])
+            with nav_col1:
+                st.markdown("<span class='nav-marker'></span>", unsafe_allow_html=True)
+                if st.button("◀", key="btn_nav_prev", use_container_width=True):
+                    st.session_state.current_idx = (cur - 1) % total_count
+                    st.rerun()
+            with nav_col2:
+                st.markdown(f"<div class='nav-counter'>{cur + 1} / {total_count}</div>", unsafe_allow_html=True)
+            with nav_col3:
+                if st.button("▶", key="btn_nav_next", use_container_width=True):
+                    st.session_state.current_idx = (cur + 1) % total_count
+                    st.rerun()
 
-        if st.button("💾 메모 저장하기", key=f"save_slide_{item.name}", use_container_width=True):
-            df_all.at[item.name, "특약사항"] = new_memo
-            conn.update(data=df_all)
-            st.toast("저장 완료!")
-            st.rerun()
+            # 저장 클릭 시 데이터 재정렬 및 워크시트 각각 분할 덮어쓰기
+            if st.button("💾 메모 및 상태 저장하기", key=f"save_slide_{cur}", use_container_width=True):
+                target_mask = (df_all["소재지"] == item["소재지"]) & (df_all["고객명"] == item["고객명"])
+                
+                if target_mask.any():
+                    df_all.loc[target_mask, "특약사항"] = new_memo
+                    df_all.loc[target_mask, "상태"] = updated_status
+                    
+                    # 상태값에 기반하여 데이터 완전 격리 처리
+                    final_completed = df_all[df_all["상태"] == "완료"]
+                    final_active = df_all[df_all["상태"] != "완료"]
+                    
+                    # 구글 워크시트에 각각 전송
+                    conn.update(worksheet="진행중매물", data=final_active)
+                    conn.update(worksheet="완료목록", data=final_completed)
+                    
+                    st.toast(f"매물 상태가 '{updated_status}'(으)로 동기화 및 타겟 시트 정렬 완료!")
+                    st.rerun()
+                else:
+                    st.error("데이터 매칭 오류가 발생했습니다. 초기화 후 재시도 해주세요.")
+
+
+# ═══════════════════════════════════════════
+# TAB 3 — 전체목록 (진행중 / 보류 / 삭제 편집용)
+# ═══════════════════════════════════════════
+
+with tab_list:
+    st.subheader(f"📋 진행 중인 매물 목록 ({len(df_active)}건)")
+    st.caption("💡 완료 상태가 아닌 매물들이 표시됩니다. 여기서 상태를 '완료'로 변경 후 저장을 누르면 자동으로 완료목록으로 이동합니다.")
+    
+    edited_active_df = st.data_editor(
+        df_active,
+        use_container_width=True,
+        hide_index=False,
+        column_config={
+            "상태":     st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "특약사항": None,
+        },
+        column_order=COLUMNS_ORDER,
+        key="active_data_editor"
+    )
+    
+    if st.button("🔄 전체목록 변경사항 저장하기", use_container_width=True, key="save_active_table"):
+        # 에디터 내에서 '완료'로 바뀐 행 필터링
+        moved_to_comp = edited_active_df[edited_active_df["상태"] == "완료"]
+        remain_active = edited_active_df[edited_active_df["상태"] != "완료"]
+        
+        # 완료목록에 결합 후 전송
+        if not moved_to_comp.empty:
+            df_completed = pd.concat([moved_to_comp, df_completed], ignore_index=True)
+            conn.update(worksheet="완료목록", data=df_completed)
+            
+        # 진행중매물 갱신
+        conn.update(worksheet="진행중매물", data=remain_active)
+        
+        st.toast("전체목록 변경사항이 완벽하게 시트에 동기화되었습니다!")
+        st.rerun()
+
+
+# ═══════════════════════════════════════════
+# TAB 4 — 완료목록 (조회 및 상태 복구용)
+# ═══════════════════════════════════════════
+
+with tab_archive:
+    st.subheader(f"✅ 완료된 매물 보관함 ({len(df_completed)}건)")
+    st.caption("💡 계약 완료된 매물들이 따로 보관되는 공간입니다. 만약 잘못 이동했다면 상태를 다시 '진행중' 등으로 바꾸고 아래 버튼을 누르세요.")
+    
+    edited_comp_df = st.data_editor(
+        df_completed,
+        use_container_width=True,
+        hide_index=False,
+        column_config={
+            "상태":     st.column_config.SelectboxColumn("상태", options=["진행중", "완료", "보류", "삭제"]),
+            "특약사항": None,
+        },
+        column_order=COLUMNS_ORDER,
+        key="completed_data_editor"
+    )
+    
+    if st.button("🔄 완료목록 변경사항 저장하기", use_container_width=True, key="save_completed_table"):
+        # 혹시나 완료 목록에서 다시 진행중/보류 등으로 원복시킨 행이 있는지 추출
+        rollback_to_active = edited_comp_df[edited_comp_df["상태"] != "완료"]
+        stay_completed = edited_comp_df[edited_comp_df["상태"] == "완료"]
+        
+        # 원복할 데이터가 있다면 진행중 시트 상단에 병합
+        if not rollback_to_active.empty:
+            df_active = pd.concat([rollback_to_active, df_active], ignore_index=True)
+            conn.update(worksheet="진행중매물", data=df_active)
+            
+        # 완료목록 최종 갱신
+        conn.update(worksheet="완료목록", data=stay_completed)
+        
+        st.toast("완료목록 변경사항이 완벽하게 시트에 동기화되었습니다!")
+        st.rerun()
