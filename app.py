@@ -43,11 +43,11 @@ COLUMNS_ORDER = ["상태", "소분류", "소재지", "면적", "가액", "월세
 
 
 # ─────────────────────────────────────────
-# 페이지 설정 & 글로벌 CSS (브라우저 탭 이모지 제거)
+# 페이지 설정 & 글로벌 CSS
 # ─────────────────────────────────────────
 
-# page_icon을 None으로 설정하여 페이지(📄) 이모지를 완전히 껐습니다.
-st.set_page_config(page_title="매물관리", page_icon=None, layout="wide")
+# 브라우저 탭 이름만 '매물관리'로 표시하고 화면 내부 제목은 삭제함
+st.set_page_config(page_title="매물관리", page_icon="📄", layout="wide")
 
 st.markdown("""
 <style>
@@ -173,7 +173,7 @@ df_all = pd.concat([df_active, df_completed], ignore_index=True)
 
 
 # ─────────────────────────────────────────
-# 상단 탭 구성
+# 상단 탭 구성 (st.title 삭제함)
 # ─────────────────────────────────────────
 
 tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "🔍 목록검색", "📋 진행목록", "✅ 완료목록"])
