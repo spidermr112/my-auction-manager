@@ -174,7 +174,7 @@ tab_register, tab_search, tab_list, tab_archive = st.tabs(["➕ 신규등록", "
 
 
 # ═══════════════════════════════════════════
-# TAB 1 — 신규등록 (★모바일 최적화 레이아웃 수정)
+# TAB 1 — 신규등록
 # ═══════════════════════════════════════════
 
 with tab_register:
@@ -201,17 +201,16 @@ with tab_register:
         
         with col_bot1:
             client_name = st.text_input("고객명", key="reg_name")
-            raw_phone   = st.text_input("연락처", placeholder="숫자만 입력해도 자동 변환됩니다", key="reg_phone")
-            if raw_phone: 
-                st.caption(f"저장 포맷: `{format_phone(raw_phone)}`")
-            addr = st.text_input("소재지 상세", key="reg_addr")
+            # 실시간 포맷 캡션 제거 및 라벨명 수정
+            raw_phone   = st.text_input("연락처 (숫자만 입력)", placeholder="예: 01012345678", key="reg_phone")
+            addr        = st.text_input("소재지 상세", key="reg_addr")
             
         with col_bot2:
             area_text = st.text_input("면적 (예: 84㎡ 또는 25평)", key="reg_area")
             price     = st.number_input("가액 (만원)", min_value=0, step=100, key="reg_price")
             rent      = st.number_input("월세 (만원)", min_value=0, step=10,  key="reg_rent")
 
-        # 특약 메모 (가장 긴 입력창이므로 아래에 전면 배치)
+        # 특약 메모
         default_memo = (f"[{sub_cat} {deal_type} 상세정보]\n"
                         "- 비밀번호: \n- 로열층/방향: \n- 관리비: \n- 입주일: ")
         memo = st.text_area("특약 내용",
